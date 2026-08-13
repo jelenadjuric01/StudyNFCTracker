@@ -1,0 +1,57 @@
+### Gradle / Android ###
+.gradle/
+build/
+local.properties
+captures/
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+*.keystore
+*.jks
+!gradle/wrapper/gradle-wrapper.jar
+
+### Android Studio ###
+# Most of .idea/ is shared project config worth committing (codeStyles, compiler,
+# misc). These are per-developer or regenerated, so they are not.
+*.iml
+.idea/caches/
+.idea/libraries/
+.idea/deploymentTargetSelector.xml
+.idea/shelf/
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+### IntelliJ IDEA ###
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Kotlin ###
+.kotlin
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store

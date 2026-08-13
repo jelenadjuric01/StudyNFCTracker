@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- NoActionBar: the built-in title bar overlaps content on Android 15+. -->
+    <style name="Theme.StudyTracker" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <!--
+      The theme for TagIntentActivity, which finishes before it draws anything.
+
+      Theme.NoDisplay would be the obvious choice, but it crashes on modern Android if the
+      activity does not finish fast enough. A translucent, animation-free window is the
+      supported way to have no visible screen: the phone shows whatever was already there.
+    -->
+    <style name="Theme.StudyTracker.Invisible" parent="Theme.StudyTracker">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Study Tracker</string>
+
+    <!-- Categories. Used in both the toasts and the setup screen. -->
+    <string name="category_school">school work</string>
+    <string name="category_personal">personal project</string>
+
+    <!-- Do Not Disturb permission -->
+    <string name="dnd_granted">Do Not Disturb access: granted.</string>
+    <string name="dnd_missing">Do Not Disturb access is needed so tapping a tag can silence notifications. Nothing works without it.</string>
+    <string name="grant_dnd">Grant in Settings</string>
+
+    <!-- Writing tags -->
+    <string name="write_instructions">Pick which tag to program, then hold it against the back of the phone. Label the tags — they look identical.</string>
+    <string name="tag_study">STUDY (start/stop)</string>
+    <string name="tag_switch">SWITCH (category)</string>
+    <string name="ready_to_write">Ready — hold a tag against the phone.</string>
+    <string name="written">Written: %1$s</string>
+    <string name="write_failed">Could not write: %1$s</string>
+    <string name="tag_locked">this tag is locked and cannot be rewritten</string>
+    <string name="tag_unsupported">this tag does not support NDEF</string>
+
+    <!-- Current state, shown on the setup screen -->
+    <string name="state_on">Study mode is ON — %1$s.</string>
+    <string name="state_off">Study mode is off.</string>
+    <string name="state_running">Running for %1$s — not counted below until you tap.</string>
+
+    <!--
+      Today's totals. The %1$-18s pads the category name to a fixed width so the durations
+      line up into a column; the TextView is monospaced for the same reason.
+    -->
+    <string name="today_heading">Today</string>
+    <string name="today_line">  %1$-18s%2$s</string>
+    <string name="today_total">  total             %1$s</string>
+    <string name="today_nothing">No study time recorded today yet.</string>
+
+    <!-- Toasts shown on a tap -->
+    <string name="tap_on">Study mode on — %1$s</string>
+    <string name="tap_off">Study mode off</string>
+    <string name="tap_finished">%1$s of %2$s recorded</string>
+    <string name="tap_switch_while_off">Study mode is off — tap the STUDY tag first</string>
+    <string name="tap_duplicate">Already registered that tap</string>
+    <string name="tap_unknown_tag">Not a study tag</string>
+    <string name="tap_no_dnd">Could not change Do Not Disturb — open Study Tracker and grant access</string>
+
+    <!-- NFC hardware -->
+    <string name="no_nfc">This phone has no NFC.</string>
+    <string name="nfc_off">NFC is switched off. Turn it on in Settings, then come back.</string>
+</resources>
