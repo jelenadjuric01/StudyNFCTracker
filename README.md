@@ -124,6 +124,10 @@ arithmetic — is covered by plain JVM unit tests: no emulator, no Robolectric, 
 - NFC needs the screen on and unlocked, on every phone. The real gesture is: wake phone →
   tap tag → put phone down.
 
+## License
+
+[MIT](LICENSE) — do what you like with it, including at your own workshop.
+
 ## Not in phase 1
 
 Room queue, `SyncWorker`, the Apps Script web app, the Google Sheet, the stats screen, and
