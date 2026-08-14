@@ -1,57 +1,81 @@
-### Gradle / Android ###
+# What must never be committed, and why.
+#
+# Three kinds of thing live here: build output (regenerated, huge, conflicts on every pull),
+# machine-specific config (correct for one computer and wrong for everyone else), and secrets
+# (a signing key committed once is a signing key leaked forever).
+
+### Build output ###
 .gradle/
 build/
-local.properties
 captures/
 .cxx/
 .externalNativeBuild/
+release/
 *.apk
 *.aab
+# Heap dumps from the Android Studio profiler. Large, and can contain whatever was in memory.
+*.hprof
+*.log
+
+### Machine-specific ###
+# Holds the Android SDK path, which differs on every computer. Android Studio recreates it when the
+# project is opened, so it is never worth committing — and committing it breaks everyone else's build.
+local.properties
+
+### Secrets ###
+# Release signing material. Never commit any of it: anyone holding the key can publish an update
+# that phones will accept as genuine.
 *.keystore
 *.jks
+*.p12
+keystore.properties
+signing.properties
+secrets.properties
+
+# The Gradle wrapper jar IS committed on purpose — it is what lets ./gradlew work on a machine with
+# no Gradle installed, which is the whole point of the wrapper. This line protects it in case a
+# global ignore rule excludes *.jar.
 !gradle/wrapper/gradle-wrapper.jar
 
-### Android Studio ###
-# Most of .idea/ is shared project config worth committing (codeStyles, compiler,
-# misc). These are per-developer or regenerated, so they are not.
+### Android Studio / IntelliJ ###
+# Most of .idea/ is shared project config worth committing — compiler, gradle, misc,
+# runConfigurations. The entries below are per-developer or regenerated on every open, so they churn
+# constantly and conflict for no reason.
 *.iml
 .idea/caches/
 .idea/libraries/
-.idea/deploymentTargetSelector.xml
-.idea/shelf/
+.idea/modules.xml
 .idea/workspace.xml
+.idea/shelf/
 .idea/navEditor.xml
 .idea/assetWizardSettings.xml
-
-### IntelliJ IDEA ###
+.idea/deploymentTargetSelector.xml
+.idea/deploymentTargetDropDown.xml
+.idea/androidTestResultsUserPreferences.xml
+.idea/appInsightsSettings.xml
+.idea/studiobot.xml
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
 ### Kotlin ###
+# Kotlin 2.x build session data.
 .kotlin
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+### Other editors ###
 .vscode/
+*.swp
+*~
 
-### Mac OS ###
+### Claude Code ###
+# Shared project instructions can be committed; this file holds one developer's own permissions.
+.claude/settings.local.json
+
+### Operating systems ###
+# A mixed room will produce all of these.
 .DS_Store
+._*
+.AppleDouble
+Thumbs.db
+Desktop.ini
+.directory
