@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The JetBrains palette: the IntelliJ "New UI" dark greys for the surfaces, and the three colours
+  of the JetBrains logo gradient for the accents.
+
+  Only one set of colours is defined, because the app has one dark theme. A day/night pair would
+  mean maintaining every colour twice for no gain here.
+-->
+<resources>
+    <!-- Logo gradient, bottom-left to top-right. -->
+    <color name="jb_orange">#FF6B00</color>
+    <color name="jb_pink">#FE2857</color>
+    <color name="jb_magenta">#E312FF</color>
+
+    <!-- Surfaces, darkest to lightest: window, card, input field, border. -->
+    <color name="ide_background">#1E1F22</color>
+    <color name="ide_surface">#2B2D30</color>
+    <color name="ide_field">#393B40</color>
+    <color name="ide_border">#4E5157</color>
+
+    <!-- Text. The dim one is for explanations, the bright one for values and headings. -->
+    <color name="ide_text">#DFE1E5</color>
+    <color name="ide_text_dim">#9DA0A8</color>
+
+    <!-- Status: granted / recording, and needs-attention. -->
+    <color name="ide_green">#5FAD65</color>
+    <color name="ide_amber">#E8A33D</color>
+</resources>

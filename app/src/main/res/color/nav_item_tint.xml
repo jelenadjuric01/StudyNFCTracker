@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A colour that depends on view state rather than a fixed value: the selected tab is JetBrains
+  pink, the other two are dim. The first matching item wins, so the checked state must come first.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:color="@color/jb_pink"
+        android:state_checked="true" />
+    <item android:color="@color/ide_text_dim" />
+</selector>

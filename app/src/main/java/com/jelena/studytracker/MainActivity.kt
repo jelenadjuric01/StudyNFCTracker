@@ -21,12 +21,15 @@ import androidx.core.app.NotificationManagerCompat
 import com.jelena.studytracker.databinding.ActivityMainBinding
 
 /**
- * The setup screen. Four jobs, in the order a new phone needs them:
+ * The app's only screen, split into three tabs by the bar at the bottom:
  *
- *  1. Get Do Not Disturb access granted — nothing works without it.
- *  2. Program the two tags.
- *  3. Set how long a session may run if the closing tap is forgotten.
- *  4. Show what study mode is doing and the hours recorded so far.
+ *  - **Session** — what study mode is doing, and the hours recorded so far.
+ *  - **Tags** — programming the two tags.
+ *  - **Setup** — Do Not Disturb access, how long a session may run if the closing tap is forgotten,
+ *    and whether the closing alarm may sound.
+ *
+ * Setup is the tab a new phone needs first, and Session is the one worth reopening later — which is
+ * why Session is the tab the screen lands on.
  *
  * The app is not used from this screen day to day: once the tags are written, the whole interaction
  * is tapping them, which [TagIntentActivity] handles. This class is wiring — the work is in
@@ -144,6 +147,28 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         binding.saveCapButton.setOnClickListener { saveCap() }
         binding.grantAlarmButton.setOnClickListener { askForAlarmPermission() }
+
+        binding.bottomNav.setOnItemSelectedListener { item ->
+            showTab(item.itemId)
+            true // "yes, select this tab" — returning false would leave the old one highlighted.
+        }
+        // The bar highlights its first item on its own, but nothing has hidden the other two panels
+        // yet — so draw the starting tab rather than waiting for a tap.
+        showTab(binding.bottomNav.selectedItemId)
+    }
+
+    /**
+     * Shows one tab's panel and hides the other two.
+     *
+     * All three panels are in the layout at once, so switching tabs is three visibility changes
+     * rather than swapping fragments in and out. That keeps every view reachable through the one
+     * binding, which is what lets [showEverything] draw the whole screen without caring which tab is
+     * open.
+     */
+    private fun showTab(itemId: Int) {
+        binding.sessionPanel.visibility = visibleIf(itemId == R.id.navSession)
+        binding.tagsPanel.visibility = visibleIf(itemId == R.id.navTags)
+        binding.setupPanel.visibility = visibleIf(itemId == R.id.navSetup)
     }
 
     /**
@@ -296,6 +321,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         } else {
             getString(R.string.state_off)
         }
+        binding.studyStateText.setTextColor(
+            getColor(if (state.active) R.color.ide_green else R.color.ide_text),
+        )
 
         showRunning(state)
         binding.todayText.text = HistorySummary(this).text()
@@ -307,23 +335,25 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         binding.dndStatusText.text =
             getString(if (granted) R.string.dnd_granted else R.string.dnd_missing)
-        binding.grantDndButton.visibility = if (granted) View.GONE else View.VISIBLE
+        binding.dndStatusText.setTextColor(statusColor(granted))
+        binding.grantDndButton.visibility = visibleIf(!granted)
     }
 
     /**
      * Says whether the auto-close can actually sound an alarm, and offers to fix it if not.
      *
-     * Both the line and the button disappear once notifications are allowed, and also when the cap is
-     * off — with no auto-close there is no alarm to ask about.
+     * The button disappears once notifications are allowed, and the whole card disappears when the
+     * cap is off — with no auto-close there is no alarm to ask about.
      */
     private fun showAlarmPermission() {
         val capEnabled = stateStore.loadAutoCloseCapMillis() > 0
         val allowed = NotificationManagerCompat.from(this).areNotificationsEnabled()
 
-        binding.alarmStatusText.visibility = if (capEnabled) View.VISIBLE else View.GONE
-        binding.grantAlarmButton.visibility = if (capEnabled && !allowed) View.VISIBLE else View.GONE
+        binding.alarmCard.visibility = visibleIf(capEnabled)
+        binding.grantAlarmButton.visibility = visibleIf(!allowed)
         binding.alarmStatusText.text =
             getString(if (allowed) R.string.alarm_granted else R.string.alarm_missing)
+        binding.alarmStatusText.setTextColor(statusColor(allowed))
     }
 
     /**
@@ -352,26 +382,39 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      * The live part of the screen: how long the current stretch has been running, and how long until
      * the session gives up on itself.
      *
-     * Blank when nothing is running — there is no sensible number to show, and a stale one would be
+     * Hidden when nothing is running — there is no sensible number to show, and a stale one would be
      * worse than none. The running stretch is deliberately kept apart from the totals below, because
      * it has not been recorded yet.
      */
     private fun showRunning(state: StudyState) {
-        if (!state.active || state.segmentStartedAtMillis <= 0) {
-            binding.runningText.text = ""
-            return
-        }
+        val isRunning = state.active && state.segmentStartedAtMillis > 0
+        binding.runningText.visibility = visibleIf(isRunning)
+        if (!isRunning) return
 
         val now = System.currentTimeMillis()
-        val running = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
+        val line = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
         val deadline = StudyModeController.autoCloseDeadline(state, stateStore.loadAutoCloseCapMillis())
 
         binding.runningText.text = when {
-            deadline == null -> running
-            deadline <= now -> "$running\n" + getString(R.string.state_closing_now)
-            else -> "$running\n" + getString(R.string.state_closes_in, formatDuration(deadline - now))
+            deadline == null -> line
+            deadline <= now -> "$line\n" + getString(R.string.state_closing_now)
+            else -> "$line\n" + getString(R.string.state_closes_in, formatDuration(deadline - now))
         }
     }
+
+    /**
+     * [View.VISIBLE] or [View.GONE], which is the pair this screen always wants: GONE removes the
+     * view from the layout, so the cards close the gap rather than leaving a hole where a hidden
+     * button was.
+     */
+    private fun visibleIf(condition: Boolean) = if (condition) View.VISIBLE else View.GONE
+
+    /**
+     * Green for a permission that is granted, amber for one that still needs a tap — so the setup tab
+     * can be read at a glance without reading the sentences.
+     */
+    private fun statusColor(granted: Boolean) =
+        getColor(if (granted) R.color.ide_green else R.color.ide_amber)
 
     private companion object {
         /** Logcat tag. Filter on this to see only messages from this screen. */

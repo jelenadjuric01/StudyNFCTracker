@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three sliders: the setup tab. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M4,7H20M4,12H20M4,17H20"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+
+    <!-- The knobs, each on a different line so the icon reads as adjustable. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9,5A2,2 0 1,1 9,9A2,2 0 1,1 9,5Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,10A2,2 0 1,1 15,14A2,2 0 1,1 15,10Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,15A2,2 0 1,1 7,19A2,2 0 1,1 7,15Z" />
+</vector>

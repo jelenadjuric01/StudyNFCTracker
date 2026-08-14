@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A clock: the session tab.
+
+  The colour is white here and recoloured at runtime by the bottom bar's tint, which is why every
+  icon in this app is drawn in white and never in a brand colour.
+
+  A circle is drawn as two half arcs, since SVG paths have no circle command: "A rx,ry rotation
+  large-arc sweep endX,endY".
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,3A9,9 0 1,1 12,21A9,9 0 1,1 12,3Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8" />
+
+    <!-- The hands: up to twelve, then out to four. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,7.5V12L15.5,14"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+</vector>

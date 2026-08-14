@@ -2,6 +2,19 @@
 <resources>
     <string name="app_name">Study Tracker</string>
 
+    <!-- The three tabs at the bottom of the screen. -->
+    <string name="tab_session">Session</string>
+    <string name="tab_tags">Tags</string>
+    <string name="tab_setup">Setup</string>
+
+    <!-- The heading on each card. One card, one thing. -->
+    <string name="card_status">Right now</string>
+    <string name="card_recorded">Recorded</string>
+    <string name="card_write_tag">Program a tag</string>
+    <string name="card_dnd">Do Not Disturb access</string>
+    <string name="card_auto_close">Auto-close</string>
+    <string name="card_alarm">Alarm</string>
+
     <!-- Categories. Used in both the toasts and the setup screen. -->
     <string name="category_school">school work</string>
     <string name="category_personal">personal project</string>

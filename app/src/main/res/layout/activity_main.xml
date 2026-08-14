@@ -1,192 +1,377 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  A ScrollView because the content is taller than a phone screen — without it the history at
-  the bottom is unreachable.
+  The screen is a column of three: a title, a scrolling middle, and the tab bar.
 
-  It also handles system bar insets, and so must not set its own padding: fitsSystemWindows
-  overwrites padding with the inset values. The inner layout owns the spacing instead.
+  Only the middle scrolls, so the title and the tabs stay put — which is why the ScrollView is one
+  child of a LinearLayout rather than the root.
+
+  fitsSystemWindows belongs on this root and nowhere else: it replaces the view's padding with the
+  status- and navigation-bar insets, so anything that sets its own padding would lose it.
 -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
 
-    <LinearLayout
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="16dp">
+        android:paddingHorizontal="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="12dp"
+        android:text="@string/app_name"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textColor="@color/ide_text" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+    <!-- The JetBrains gradient, as a hairline under the title. -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:background="@drawable/brand_gradient" />
 
-        <!-- 1. Permission. Nothing else in the app works until this is granted. -->
-        <TextView
-            android:id="@+id/dndStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-        <Button
-            android:id="@+id/grantDndButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/grant_dnd" />
-
-        <!-- 2. Programming the tags. -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="@string/write_instructions"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-        <RadioGroup
-            android:id="@+id/tagChoice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <RadioButton
-                android:id="@+id/chooseStudy"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/tag_study" />
-
-            <RadioButton
-                android:id="@+id/chooseSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="24dp"
-                android:text="@string/tag_switch" />
-
-        </RadioGroup>
-
-        <TextView
-            android:id="@+id/nfcStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-        <TextView
-            android:id="@+id/writeStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <!-- 3. The auto-close cap: how long a session may run if the closing tap is forgotten. -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="@string/cap_instructions"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
+    <!--
+      layout_height="0dp" with a weight is the LinearLayout idiom for "take whatever is left": the
+      title and the tab bar are measured first, and this fills the gap between them.
+    -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="bottom"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="16dp">
 
-            <EditText
-                android:id="@+id/capHoursInput"
-                android:layout_width="64dp"
-                android:layout_height="wrap_content"
-                android:importantForAutofill="no"
-                android:inputType="number"
-                android:maxLength="2"
-                android:maxLines="1" />
+            <!--
+              One panel per tab. All three live here at once and the tab bar shows one and hides the
+              other two — far less machinery than fragments, and every view stays reachable through
+              a single binding.
+            -->
 
-            <!-- labelFor is what makes a screen reader announce the box as the hours field. -->
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- ===== Tab 1: the session. What study mode is doing, and the hours so far. ===== -->
+            <LinearLayout
+                android:id="@+id/sessionPanel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:labelFor="@id/capHoursInput"
-                android:text="@string/unit_hours" />
+                android:orientation="vertical">
 
-            <EditText
-                android:id="@+id/capMinutesInput"
-                android:layout_width="64dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:importantForAutofill="no"
-                android:inputType="number"
-                android:maxLength="2"
-                android:maxLines="1" />
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:labelFor="@id/capMinutesInput"
-                android:text="@string/unit_minutes" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
 
-            <Button
-                android:id="@+id/saveCapButton"
-                android:layout_width="wrap_content"
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_status" />
+
+                        <TextView
+                            android:id="@+id/studyStateText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            android:textColor="@color/ide_text" />
+
+                        <TextView
+                            android:id="@+id/runningText"
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_recorded" />
+
+                        <!-- Monospaced so the durations line up into a column. -->
+                        <TextView
+                            android:id="@+id/todayText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="@color/ide_text" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+            <!-- ===== Tab 2: programming the two tags. ===== -->
+            <LinearLayout
+                android:id="@+id/tagsPanel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:text="@string/cap_save" />
+                android:orientation="vertical">
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_write_tag" />
+
+                        <TextView
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/write_instructions" />
+
+                        <RadioGroup
+                            android:id="@+id/tagChoice"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/chooseStudy"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/tag_study"
+                                android:textColor="@color/ide_text" />
+
+                            <RadioButton
+                                android:id="@+id/chooseSwitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/tag_switch"
+                                android:textColor="@color/ide_text" />
+
+                        </RadioGroup>
+
+                        <TextView
+                            android:id="@+id/nfcStatusText"
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp" />
+
+                        <TextView
+                            android:id="@+id/writeStatusText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            android:textColor="@color/jb_pink" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+            <!-- ===== Tab 3: the one-off setup — permissions and the auto-close cap. ===== -->
+            <LinearLayout
+                android:id="@+id/setupPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Nothing in the app works until this is granted, so it comes first. -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_dnd" />
+
+                        <TextView
+                            android:id="@+id/dndStatusText"
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+
+                        <Button
+                            android:id="@+id/grantDndButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/grant_dnd" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_auto_close" />
+
+                        <TextView
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/cap_instructions" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <EditText
+                                android:id="@+id/capHoursInput"
+                                style="@style/NumberField"
+                                android:importantForAutofill="no" />
+
+                            <!-- labelFor is what makes a screen reader announce the box as the hours field. -->
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:labelFor="@id/capHoursInput"
+                                android:text="@string/unit_hours"
+                                android:textColor="@color/ide_text_dim" />
+
+                            <EditText
+                                android:id="@+id/capMinutesInput"
+                                style="@style/NumberField"
+                                android:importantForAutofill="no"
+                                android:layout_marginStart="16dp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:labelFor="@id/capMinutesInput"
+                                android:text="@string/unit_minutes"
+                                android:textColor="@color/ide_text_dim" />
+
+                            <Button
+                                android:id="@+id/saveCapButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="16dp"
+                                android:text="@string/cap_save" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/capStatusText"
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Hidden whole when the cap is off: with no auto-close there is no alarm to ask about. -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/alarmCard"
+                    style="@style/Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/CardTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/card_alarm" />
+
+                        <TextView
+                            android:id="@+id/alarmStatusText"
+                            style="@style/Explanation"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+
+                        <Button
+                            android:id="@+id/grantAlarmButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/grant_alarm" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/capStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+    </ScrollView>
 
-        <TextView
-            android:id="@+id/alarmStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ide_surface"
+        app:itemIconTint="@color/nav_item_tint"
+        app:itemTextColor="@color/nav_item_tint"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav" />
 
-        <Button
-            android:id="@+id/grantAlarmButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/grant_alarm" />
-
-        <!-- 4. What the last tap left study mode doing, and the hours recorded so far. -->
-        <TextView
-            android:id="@+id/studyStateText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <TextView
-            android:id="@+id/runningText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-        <!-- Monospaced so the durations line up into a column. -->
-        <TextView
-            android:id="@+id/todayText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:fontFamily="monospace"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-    </LinearLayout>
-
-</ScrollView>
+</LinearLayout>

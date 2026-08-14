@@ -1,19 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher icon: a book on the JetBrains gradient.
+
+  A gradient inside a vector needs API 24, which is this app's minimum, so it is safe here.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <path
-        android:fillColor="#1B5E20"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt"
+            name="android:fillColor">
+            <!-- Bottom-left to top-right, the direction the logo runs. -->
+            <gradient
+                android:endX="108"
+                android:endY="0"
+                android:startX="0"
+                android:startY="108"
+                android:type="linear">
+                <item
+                    android:color="@color/jb_orange"
+                    android:offset="0" />
+                <item
+                    android:color="@color/jb_pink"
+                    android:offset="0.5" />
+                <item
+                    android:color="@color/jb_magenta"
+                    android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- A book: study. -->
+    <!-- A book: study. Black, like the square in the JetBrains mark. -->
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#000000"
         android:pathData="M26,32h24c4,0 4,4 4,4v44c0,0 0,-4 -4,-4h-24z" />
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#000000"
         android:pathData="M82,32h-24c-4,0 -4,4 -4,4v44c0,0 0,-4 4,-4h24z" />
 </vector>

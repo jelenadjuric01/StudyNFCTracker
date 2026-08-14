@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The three tabs at the bottom of the screen, in the order they are needed: setup once, tags once,
+  then the session view every day after that.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/navSession"
+        android:icon="@drawable/ic_tab_session"
+        android:title="@string/tab_session" />
+
+    <item
+        android:id="@+id/navTags"
+        android:icon="@drawable/ic_tab_tags"
+        android:title="@string/tab_tags" />
+
+    <item
+        android:id="@+id/navSetup"
+        android:icon="@drawable/ic_tab_setup"
+        android:title="@string/tab_setup" />
+</menu>

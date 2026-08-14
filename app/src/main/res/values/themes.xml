@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- NoActionBar: the built-in title bar overlaps content on Android 15+. -->
-    <style name="Theme.StudyTracker" parent="Theme.Material3.DayNight.NoActionBar" />
+    <!--
+      NoActionBar: the built-in title bar overlaps content on Android 15+, and the screen draws its
+      own title anyway.
+
+      Dark rather than DayNight: the palette is the IntelliJ dark one, so there is no light variant
+      to switch to.
+    -->
+    <style name="Theme.StudyTracker" parent="Theme.Material3.Dark.NoActionBar">
+        <!--
+          Material reads the whole UI off these role names, so setting them here is what colours the
+          buttons, radio buttons, cards and text without touching a single view.
+        -->
+        <item name="colorPrimary">@color/jb_pink</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">@color/ide_field</item>
+        <item name="colorOnSecondaryContainer">@color/ide_text</item>
+        <item name="android:colorBackground">@color/ide_background</item>
+        <item name="colorSurface">@color/ide_surface</item>
+        <item name="colorOnSurface">@color/ide_text</item>
+        <item name="colorOnSurfaceVariant">@color/ide_text_dim</item>
+        <item name="colorOutline">@color/ide_border</item>
+
+        <!-- The bars at the top and bottom of the phone, so they blend into the window. -->
+        <item name="android:statusBarColor">@color/ide_background</item>
+        <item name="android:navigationBarColor">@color/ide_surface</item>
+    </style>
 
     <!--
       The theme for TagIntentActivity, which finishes before it draws anything.
@@ -16,5 +40,52 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <!--
+      One card per thing the screen has to say. Defined once as a style because the layout uses it
+      seven times, and seven copies of the same four attributes would be four edits each time.
+    -->
+    <style name="Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/ide_surface</item>
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/ide_border</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:layout_marginBottom">12dp</item>
+    </style>
+
+    <!-- The small upper-case heading at the top of each card. -->
+    <style name="CardTitle">
+        <item name="android:textAppearance">?attr/textAppearanceLabelLarge</item>
+        <item name="android:textColor">@color/ide_text_dim</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:layout_marginBottom">8dp</item>
+    </style>
+
+    <!-- Explanatory sentences: dimmer than the values they explain. -->
+    <style name="Explanation">
+        <item name="android:textAppearance">?attr/textAppearanceBodyMedium</item>
+        <item name="android:textColor">@color/ide_text_dim</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <!--
+      The two number boxes of the auto-close cap.
+
+      android:importantForAutofill is set on the views instead of here: in a style it is only legal
+      from API 26, and this app runs from 24.
+    -->
+    <style name="NumberField">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/field_background</item>
+        <item name="android:gravity">center</item>
+        <item name="android:inputType">number</item>
+        <item name="android:maxLength">2</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:textColor">@color/ide_text</item>
     </style>
 </resources>
