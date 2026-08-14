@@ -27,7 +27,11 @@ Everything stays on the phone. No account, no network, no server.
 | **An Android phone with NFC** | Android 7.0 (API 24) or newer. The emulator cannot do NFC, so testing needs a real device. |
 | **Two writable NFC tags** | NTAG213/215/216 stickers are the usual choice and cost very little. Any NDEF-writable tag works. The app programs them for you. |
 | **Do Not Disturb access** | A one-off grant in system settings. The app cannot silence anything without it. |
+| **Notification permission** | Optional. Only needed for the alarm when a session closes itself. |
 | **To build it yourself** | JDK 21 and the Android SDK. See [Building](#building). |
+
+Teaching this? [WORKSHOP.md](WORKSHOP.md) breaks the app into six steps that each end with something
+demonstrable, and no step rewrites what an earlier one built.
 
 ---
 
@@ -122,10 +126,16 @@ Forgetting to tap STUDY at the end is the normal failure mode of any toggle. Lef
 would stay silenced all night and the session would eventually claim every hour since.
 
 So sessions close themselves. On the setup screen you set a cap in **hours and minutes** — three
-hours by default. When it expires the phone is unsilenced, the session is closed, and the stretch is
-recorded **cut off at the cap**, not at whenever the alarm happened to arrive. Such a stretch is
-flagged as auto-closed, and any total containing one says so, because it is a cap rather than a
-measurement.
+hours by default. When it expires an alarm sounds, the phone is unsilenced, the session is closed,
+and the stretch is recorded **cut off at the cap**, not at whenever the alarm happened to arrive.
+Such a stretch is flagged as auto-closed, and any total containing one says so, because it is a cap
+rather than a measurement.
+
+**The alarm matters as much as the closing.** Studying may well still be going on, and the STUDY tag
+needs tapping again to keep counting — so it rings at alarm volume and vibrates, rather than relying
+on you noticing that notifications quietly came back. Tapping it opens the app. It needs permission
+to post notifications, which the setup screen asks for; refusing costs only the alarm, and sessions
+still close.
 
 - **The cap runs from the start of the session**, not from the last category switch — otherwise
   switching every hour would keep a session alive forever.
@@ -211,7 +221,7 @@ The network is never on this path, which is why a tap is instant.
 
 | File | Job |
 |---|---|
-Fourteen small files, each with one job. The five at the top have no Android imports at all, which
+Fifteen small files, each with one job. The five at the top have no Android imports at all, which
 is what makes the rules testable without a phone.
 
 | File | Job |
@@ -227,6 +237,7 @@ is what makes the rules testable without a phone.
 | `NfcTagWriter.kt` | Writes a payload onto a physical tag. |
 | `AutoCloseScheduler.kt` | Sets and cancels the alarm for a forgotten closing tap. |
 | `AutoCloseReceiver.kt` | Closes the forgotten session; re-arms the alarm after a reboot. |
+| `AutoCloseAlarm.kt` | Rings, so you know a session was closed for you. |
 | `HistorySummary.kt` | Builds the today / yesterday / last-7-days text. |
 | `TagIntentActivity.kt` | No UI. Handles a tap, reports it, finishes. |
 | `MainActivity.kt` | The setup screen. Wiring only. |
