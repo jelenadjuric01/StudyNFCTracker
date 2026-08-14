@@ -115,22 +115,19 @@ class TagIntentActivity : AppCompatActivity() {
      */
     private fun changedMessage(state: StudyState, completed: StudySegment?): String {
         val finished = completed?.let {
-            getString(R.string.tap_finished, formatDuration(it.durationMillis), categoryLabel(it.category))
+            getString(
+                R.string.tap_finished,
+                formatDuration(it.durationMillis),
+                categoryLabel(this, it.category),
+            )
         }
         val now = if (state.active) {
-            getString(R.string.tap_on, categoryLabel(state.category))
+            getString(R.string.tap_on, categoryLabel(this, state.category))
         } else {
             getString(R.string.tap_off)
         }
         return if (finished == null) now else "$now\n$finished"
     }
-
-    private fun categoryLabel(category: Category): String = getString(
-        when (category) {
-            Category.SCHOOL -> R.string.category_school
-            Category.PERSONAL -> R.string.category_personal
-        },
-    )
 
     /**
      * The text of the first NDEF record on the tapped tag, or `null` if the intent carries

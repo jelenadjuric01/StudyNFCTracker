@@ -1,12 +1,18 @@
 package com.jelena.studytracker
 
-/** Why a tap changed nothing, so the caller can say something useful about it. */
+/** Why nothing changed, so the caller can say something useful about it. */
 enum class IgnoredReason {
 
     /** The same tag was tapped twice inside [StudyModeController.DEBOUNCE_MILLIS]. */
     DUPLICATE_TAP,
 
-    /** The SWITCH tag was tapped while study mode was off. */
+    /**
+     * There was no running session for this to affect.
+     *
+     * Two different situations produce it: the SWITCH tag tapped while study mode is off, and the
+     * auto-close alarm arriving after the session was already ended by a real tap. Both mean "there
+     * is nothing here to do", and neither is an error.
+     */
     MODE_OFF,
 }
 

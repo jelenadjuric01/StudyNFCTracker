@@ -211,20 +211,29 @@ The network is never on this path, which is why a tap is instant.
 
 | File | Job |
 |---|---|
+Fourteen small files, each with one job. The five at the top have no Android imports at all, which
+is what makes the rules testable without a phone.
+
+| File | Job |
+|---|---|
 | `StudyTag.kt` | The two tags and the text written on them. |
 | `StudyState.kt` | What the app knows after the last tap. Immutable. |
-| `StudyModeController.kt` | The rules: state + tag → new state, the stretch just ended, and when to give up on a session. No Android imports. |
-| `StudyTime.kt` | Durations, totals per day and week, the local-midnight boundary, the log line format. All pure. |
+| `StudyModeController.kt` | The rules: state + tag → new state, the stretch just ended, and when to give up on a session. |
+| `StudySegment.kt` | A recorded stretch, totals over a day or a week, and the log line format. |
+| `StudyTime.kt` | Durations in words, and which local day a moment belongs to. |
 | `SessionLog.kt` | Appends finished stretches to the log file and reads them back. |
 | `StudyStateStore.kt` | Current state and the cap, in `SharedPreferences`. |
 | `DndController.kt` | Silences and unsilences the phone. |
+| `NfcTagWriter.kt` | Writes a payload onto a physical tag. |
 | `AutoCloseScheduler.kt` | Sets and cancels the alarm for a forgotten closing tap. |
 | `AutoCloseReceiver.kt` | Closes the forgotten session; re-arms the alarm after a reboot. |
+| `HistorySummary.kt` | Builds the today / yesterday / last-7-days text. |
 | `TagIntentActivity.kt` | No UI. Handles a tap, reports it, finishes. |
-| `MainActivity.kt` | Setup: permission, programming tags, the cap, your hours. |
+| `MainActivity.kt` | The setup screen. Wiring only. |
 
-`StudyModeController` and `StudyTime` deliberately have no Android dependencies. They hold every
-real rule in the app, so the whole rule set is covered by plain JVM tests — 56 of them, over every
+`StudyModeController`, `StudySegment`, `StudyTime`, `StudyState` and `StudyTag` deliberately have no
+Android dependencies. They hold every real rule in the app, so the whole rule set is covered by
+plain JVM tests — 56 of them, over every
 state × tag combination, the double-tap guard, the duration arithmetic, the day boundary, the log
 format and the auto-close. No emulator, no Robolectric, no tags, and no waiting three hours to find
 out whether the cap works.
@@ -281,10 +290,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 This is a deliberately small, self-contained app. It has **no sync, no cloud, no charts, and no
 history beyond what the phone holds**. It tracks two categories, not arbitrary projects, and it
 serves one person on one phone.
-
-A companion design document (kept outside this repository) plans a second phase: a queue of taps, a
-Google Apps Script endpoint and a Google Sheet as the permanent record, with charts for free and an
-iPhone Shortcut alongside. None of that is here, and the app is complete without it.
 
 ---
 
