@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.NFC" />
 
@@ -49,6 +50,15 @@
           list; taskAffinity="" stops it being folded into MainActivity's task, so
           tapping a tag never resurrects the setup screen behind it.
 
+          showWhenLocked lets this run over the lock screen, so a tap on a locked (but awake)
+          phone applies immediately and its toast is actually visible, instead of the launch
+          being held back until the phone is unlocked. Added in API 27 and ignored below it,
+          which is what tools:targetApi asserts.
+
+          It does nothing for a phone whose screen is off: Android stops polling for tags
+          entirely at that point, so no intent is ever sent. Whether a locked phone reads tags
+          at all is a system setting ("Require device unlock for NFC"), not the app's call.
+
           exported="true" is what tag dispatch requires, and it cannot be narrowed:
           Android delivers NDEF_DISCOVERED itself, so no permission can be demanded of
           the sender. Any other app on the phone could therefore fake this intent and
@@ -62,8 +72,10 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:noHistory="true"
+            android:showWhenLocked="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.StudyTracker.Invisible">
+            android:theme="@style/Theme.StudyTracker.Invisible"
+            tools:targetApi="o_mr1">
             <intent-filter>
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />

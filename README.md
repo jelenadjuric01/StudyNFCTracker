@@ -161,8 +161,23 @@ waiting three hours to find out whether the cap works:
   Gradle*. AGP rejects JDK 25 and 26, and Android Studio's bundled JBR is 25. The failure
   message is just the version number, with no explanation.
 - **The emulator cannot do NFC.** All testing needs a real phone.
-- NFC needs the screen on and unlocked, on every phone. The real gesture is: wake phone →
-  tap tag → put phone down.
+
+## Locked and sleeping phones
+
+**A phone with the screen off cannot read tags.** Android stops polling for them entirely, so no
+intent is ever sent and no app can change that — the only NFC that survives a dark screen is card
+emulation for contactless payment, which cannot read a tag. iPhone is the same. So the gesture is
+always: wake the phone → tap → put it down.
+
+**A locked phone with the screen on usually can**, and the app is set up for it: `TagIntentActivity`
+is `showWhenLocked`, so a tap applies immediately and its toast is visible over the lock screen
+rather than being held back until the phone is unlocked.
+
+Whether tags are read while locked is a system setting, not the app's call. Look for
+*Settings → Connected devices → Connection preferences → NFC → Require device unlock for NFC*
+(the wording varies; some phones call it Secure NFC). With it **on**, NFC does nothing until you
+unlock. Turning it off is a real trade-off: it also lets a payment card be read while the phone is
+locked, which is the reason it defaults to on.
 
 ## License
 
