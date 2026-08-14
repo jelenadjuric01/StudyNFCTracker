@@ -1,50 +1,84 @@
 # Study NFC Tracker
 
-Tap an NFC tag to start a focused study session: the phone silences its notifications and
-starts tracking. A second tag switches between *school work* and *personal project*
-mid-session. Tapping the first tag again ends the session and unsilences.
+An Android app that turns two NFC stickers into a study timer.
 
-This repository is **phase 1** of [the design](../study-mode-tracker-design.md): tags, tap,
-Do Not Disturb, toast, and today's hours kept on the phone. No network, no database, no
-Google Sheet yet — the point of phase 1 is to find out whether the gesture is one you
-actually use.
+Tap the **STUDY** tag and the phone silences its notifications and starts counting. Tap the
+**SWITCH** tag to move between *school work* and *personal project* without stopping the clock.
+Tap STUDY again to finish: notifications come back and the time is written down.
 
-## The gesture
+The point is that starting and stopping costs no attention — no app to open, no timer to set. You
+tap a sticker on your desk and put the phone down.
 
 ```
-tap STUDY   → mode ON,  silenced, tracking SCHOOL
+tap STUDY   → mode ON,  notifications silenced, tracking SCHOOL
 tap SWITCH  → now tracking PERSONAL
 tap SWITCH  → back to SCHOOL
-tap STUDY   → mode OFF, unsilenced
+tap STUDY   → mode OFF, notifications back, time recorded
 ```
 
-`SWITCH` tapped while the mode is off does nothing. The same tag tapped twice within two
-seconds counts once — the radio can read one physical tap twice, and that would otherwise
-start and immediately end a session.
+Everything stays on the phone. No account, no network, no server.
 
-## Setup
+---
 
-1. **Open the app and grant Do Not Disturb access.** There is no in-app dialog for this
-   permission; the button walks you to the right system screen. Nothing works without it.
-2. **Program two NTAG215 stickers.** Pick `STUDY`, hold a tag against the back of the phone,
-   wait for "Written". Pick `SWITCH`, do the same with the other one.
-3. **Label the tags with a pen.** They look identical, and there is no way to tell them
-   apart afterwards without tapping them.
+## What you need
 
-Then close the app. Day to day you tap the tags; you only open the app to check your hours.
+| | |
+|---|---|
+| **An Android phone with NFC** | Android 7.0 (API 24) or newer. The emulator cannot do NFC, so testing needs a real device. |
+| **Two writable NFC tags** | NTAG213/215/216 stickers are the usual choice and cost very little. Any NDEF-writable tag works. The app programs them for you. |
+| **Do Not Disturb access** | A one-off grant in system settings. The app cannot silence anything without it. |
+| **To build it yourself** | JDK 21 and the Android SDK. See [Building](#building). |
 
-## Seeing your hours
+---
 
-Every tap that ends a stretch of time reports it — tapping SWITCH after 45 minutes of school
-work says so, and so does tapping STUDY to finish. Short stretches report in seconds, which is
-what makes the app demonstrable without waiting around:
+## Setting it up
+
+**1. Install the app** and open it.
+
+**2. Grant Do Not Disturb access.** The first line on screen says whether it is granted; the button
+below takes you to the right system screen, because Android has no in-app dialog for this
+permission. Nothing works until it is on.
+
+**3. Program the tags.** Choose `STUDY`, hold a tag flat against the back of the phone, and wait for
+*"Written: study"*. Choose `SWITCH` and do the same with the other tag. The app must be open for
+this — while it is, it takes over the NFC radio so that tapping a tag writes to it instead of
+triggering study mode.
+
+**4. Label the tags with a pen.** They are identical once written, and the only way to tell them
+apart afterwards is to tap one and see what happens.
+
+**5. Set the auto-close cap** if three hours is not what you want. See
+[Forgetting the second tap](#forgetting-the-second-tap).
+
+Then close the app. Day to day you only tap the tags — you open the app to check your hours.
+
+---
+
+## Using it
+
+**Tapping needs the screen on.** Android does not read tags while the screen is off, so the gesture
+is: wake the phone → tap → put it down. Whether it works while *locked* depends on one system
+setting — see [Locked phones](#locked-phones).
+
+Every tap that ends a stretch of time says how long it was:
 
 ```
 Study mode off
 47 min 12 s of personal project recorded
 ```
 
-Open the app for today, yesterday and the week:
+Tapping SWITCH reports the same way, because switching category ends one stretch and starts
+another. Stretches under a minute are reported in seconds, so you can try the whole thing out
+without waiting around.
+
+Two taps of the same tag within two seconds count as one. The radio can read a single physical tap
+twice, and without that rule one tap would start and instantly end a session.
+
+Tapping SWITCH while study mode is off does nothing, and says so.
+
+### Your hours
+
+Open the app:
 
 ```
 Study mode is ON — school work.
@@ -66,124 +100,194 @@ Last 7 days
   total            11 h 16 min 40 s
 ```
 
-Things worth knowing about those numbers:
+- **Nothing is ever overwritten.** Every finished stretch is appended to a file, and every figure
+  here is computed from it, so a day rolling over loses nothing.
+- **The stretch running now is listed apart from the totals** because it has not been recorded yet.
+  It joins them when a tap ends it.
+- **Those first lines tick every second**; the totals do not, because they cannot change while the
+  app is open — a tap cannot reach the tap handler while this screen holds the NFC radio. The one
+  exception is the auto-close firing while you watch, which the app notices and redraws for.
+- **Durations leave out units that are zero** — `2 h 14 min 3 s`, but `1 h` for an exact hour and
+  `40 s` for a short one. Never `0 hours`.
+- **A total is the sum of the figures above it**, each snapped to the second it is printed at, so
+  the column always adds up on screen.
+- **A session crossing midnight counts entirely on the day it ended.** Splitting it would be more
+  accurate and considerably more code.
 
-- **Nothing is ever overwritten.** Every finished stretch is appended to a log file, and every
-  figure above is computed from it. Days rolling over lose nothing.
-- **A session that crosses midnight counts entirely on the day it ended.** Splitting it would be
-  more accurate and a lot more code; the Sheet gets this right later from raw timestamps.
-- **Durations read in hours, minutes and seconds, with zero units left out** — `2 h 14 min 3 s`,
-  but `1 h` for an exact hour and `40 s` for a short demo tap. Never `0 hours`.
-- **The total is the sum of the figures above it**, each snapped to the second it is printed at,
-  rather than the raw sum rounded separately. Otherwise the column can disagree with itself.
-
-The stretch running right now is shown separately because it is not recorded anywhere yet — it
-joins the totals when a tap closes it.
-
-Those first two lines update every second while the app is open. The totals below them do not,
-because they cannot change: a tap cannot reach the tap handler while this screen holds NFC reader
-mode. The one exception is the auto-close firing while you watch, which does end the session — so
-the tick notices that and redraws everything. Nothing ticks once the app is in the background.
+---
 
 ## Forgetting the second tap
 
-Forgetting to tap STUDY at the end is the normal failure mode of any toggle: the phone would stay
-silenced all night, and the session would eventually claim every hour since.
+Forgetting to tap STUDY at the end is the normal failure mode of any toggle. Left alone, the phone
+would stay silenced all night and the session would eventually claim every hour since.
 
-So sessions close themselves. The cap is set on the setup screen in hours and minutes — three
-hours by default — and when it expires the phone is unsilenced, the session is closed, and the
-stretch is recorded **cut off at the cap rather than at whenever the alarm actually arrived**. It
-is flagged in the log as auto-closed, and anything containing one says so, because that figure is
-a cap and not a measurement.
-
-Two details:
+So sessions close themselves. On the setup screen you set a cap in **hours and minutes** — three
+hours by default. When it expires the phone is unsilenced, the session is closed, and the stretch is
+recorded **cut off at the cap**, not at whenever the alarm happened to arrive. Such a stretch is
+flagged as auto-closed, and any total containing one says so, because it is a cap rather than a
+measurement.
 
 - **The cap runs from the start of the session**, not from the last category switch — otherwise
-  switching every hour would keep a session alive forever. Changing it mid-session moves the
-  deadline: raising three hours to six two hours in leaves four hours. Lowering it below the time
-  already elapsed closes the session almost immediately.
-- **Zero in both boxes turns it off**, for anyone who would rather it never intervened.
+  switching every hour would keep a session alive forever.
+- **Changing it moves the deadline of the session already running.** Raising three hours to six
+  two hours in leaves four hours. Lowering it below the time already elapsed closes the session
+  almost immediately.
+- **Zero in both boxes turns it off**, if you would rather nothing ever intervened.
 
-The alarm is inexact (`setAndAllowWhileIdle`) so it needs no special permission, and may fire a few
-minutes late — which costs nothing, since the recorded time comes from the deadline, not the alarm.
-It is re-armed after a reboot or a reinstall, both of which drop pending alarms.
+The alarm is deliberately inexact, so it needs no special permission and cannot be defeated by the
+phone dozing; it may fire a few minutes late, which costs nothing because the recorded time comes
+from the deadline rather than the alarm. It is re-armed after a reboot or a reinstall, both of which
+drop pending alarms.
+
+---
+
+## Locked phones
+
+**Screen off: not possible.** Android stops polling for tags when the screen is off, so no app is
+ever told anything. The only NFC that survives a dark screen is card emulation for contactless
+payment, which cannot read a tag. iPhone behaves the same way.
+
+**Locked with the screen on: usually works.** The app is set up for it — the tap handler is declared
+`showWhenLocked`, so a tap takes effect immediately and its message appears over the lock screen
+instead of waiting for you to unlock.
+
+Whether a locked phone reads tags at all is a system setting rather than the app's call:
+
+> *Settings → Connected devices → Connection preferences → NFC → **Require device unlock for NFC***
+> (some phones call it *Secure NFC*; the wording varies by manufacturer)
+
+With it **on**, NFC does nothing until you unlock, and no app can override that. Turning it **off**
+is a real trade-off, not just a convenience: the same setting is what stops a payment card being
+read while your phone is locked in a pocket.
+
+---
+
+## Where your data lives
+
+Two places, both private to the app:
+
+| What | Where |
+|---|---|
+| Every recorded stretch — the whole history | `sessions.log` in app storage, one line per stretch: `category,start,end,autoClosed` |
+| Current state and the auto-close cap | `SharedPreferences`, a handful of numbers |
+
+Consequences worth knowing:
+
+- **Reinstalling over the top keeps everything.** Uninstalling or *Clear data* deletes it.
+- **There is no backup.** The app opts out of Android's cloud backup, so a lost or reset phone loses
+  your history.
+- **No other app can read it**, and nothing leaves the phone.
+
+On a debug build you can read the log yourself:
+
+```bash
+adb shell run-as com.jelena.studytracker cat /data/data/com.jelena.studytracker/files/sessions.log
+```
+
+---
 
 ## How a tap reaches the app
 
-Each tag holds one NDEF record with the MIME type
-`application/vnd.com.jelena.studytracker` and a payload of `study` or `switch`. That
-app-specific MIME type is what lets an `NDEF_DISCOVERED` intent filter launch the app on a
-tap even when it is closed. A plain URL record could not do this — Android would open a
-browser instead.
+Each tag holds a single NDEF record with the app-specific MIME type
+`application/vnd.com.jelena.studytracker` and a payload of `study` or `switch`.
+
+That MIME type is the trick: it lets an `NDEF_DISCOVERED` intent filter launch the app on a tap even
+when the app is closed. A plain URL record could not do this — Android would open a browser instead.
 
 ```
 tag tapped
   → Android launches TagIntentActivity (no visible window)
-  → StudyModeController computes the new state
+  → StudyModeController works out the new state
   → DndController silences or unsilences the phone
-  → StudyStateStore saves the state
+  → the state is saved, and any finished stretch is appended to the log
+  → the auto-close alarm is set or cancelled
   → toast: "Study mode on — school work"
   → activity finishes
 ```
 
-## The files
+The network is never on this path, which is why a tap is instant.
+
+### The files
 
 | File | Job |
 |---|---|
 | `StudyTag.kt` | The two tags and the text written on them. |
 | `StudyState.kt` | What the app knows after the last tap. Immutable. |
-| `StudyModeController.kt` | The rules: current state + tag → new state, plus the stretch of time that tap just ended. No Android imports. |
-| `StudyTime.kt` | Segments, totals per day and week, the local-midnight boundary, duration wording, the log line format. All pure. |
-| `StudyStateStore.kt` | Saves the state and the auto-close cap between taps (`SharedPreferences`). |
-| `SessionLog.kt` | Appends finished segments to a file, reads them back. The whole history. |
+| `StudyModeController.kt` | The rules: state + tag → new state, the stretch just ended, and when to give up on a session. No Android imports. |
+| `StudyTime.kt` | Durations, totals per day and week, the local-midnight boundary, the log line format. All pure. |
+| `SessionLog.kt` | Appends finished stretches to the log file and reads them back. |
+| `StudyStateStore.kt` | Current state and the cap, in `SharedPreferences`. |
+| `DndController.kt` | Silences and unsilences the phone. |
 | `AutoCloseScheduler.kt` | Sets and cancels the alarm for a forgotten closing tap. |
 | `AutoCloseReceiver.kt` | Closes the forgotten session; re-arms the alarm after a reboot. |
-| `DndController.kt` | Silences and unsilences the phone. |
-| `TagIntentActivity.kt` | No UI. Handles a tap, toasts, finishes. |
-| `MainActivity.kt` | Setup: permission, programming tags, current state. |
+| `TagIntentActivity.kt` | No UI. Handles a tap, reports it, finishes. |
+| `MainActivity.kt` | Setup: permission, programming tags, the cap, your hours. |
 
-`StudyModeController` and `StudyTime` have no Android dependencies on purpose. They hold the
-only real rules in the app, so every state × tag combination, the auto-close arithmetic and the
-log format are all covered by plain JVM unit tests — no emulator, no Robolectric, no tags, and no
-waiting three hours to find out whether the cap works:
+`StudyModeController` and `StudyTime` deliberately have no Android dependencies. They hold every
+real rule in the app, so the whole rule set is covered by plain JVM tests — 56 of them, over every
+state × tag combination, the double-tap guard, the duration arithmetic, the day boundary, the log
+format and the auto-close. No emulator, no Robolectric, no tags, and no waiting three hours to find
+out whether the cap works.
 
 ```bash
 ./gradlew testDebugUnitTest
 ```
 
+Silencing uses `INTERRUPTION_FILTER_PRIORITY` rather than blocking everything, so whatever you have
+marked as important — starred contacts, alarms — still gets through. A study session cannot swallow
+an emergency call.
+
+---
+
 ## Building
 
 ```bash
-./gradlew assembleDebug     # app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug     # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew testDebugUnitTest # the test suite
 ```
 
-- **Set the Gradle JDK to 21** in *Settings → Build, Execution, Deployment → Build Tools →
-  Gradle*. AGP rejects JDK 25 and 26, and Android Studio's bundled JBR is 25. The failure
-  message is just the version number, with no explanation.
-- **The emulator cannot do NFC.** All testing needs a real phone.
+Then install it over USB or wireless debugging:
 
-## Locked and sleeping phones
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
 
-**A phone with the screen off cannot read tags.** Android stops polling for them entirely, so no
-intent is ever sent and no app can change that — the only NFC that survives a dark screen is card
-emulation for contactless payment, which cannot read a tag. iPhone is the same. So the gesture is
-always: wake the phone → tap → put it down.
+- **Set the Gradle JDK to 21** — *Settings → Build, Execution, Deployment → Build Tools → Gradle*.
+  AGP rejects JDK 25 and 26, and Android Studio's bundled runtime is 25. The failure message is
+  just the version number, with no explanation, so this is worth doing before anything else.
+- Known-good versions: AGP 8.7.3, Kotlin 2.0.21, Gradle 8.11.1, compileSdk 35, minSdk 24.
+- `local.properties` holds the Android SDK path, is specific to your machine, and is not in the
+  repository. Android Studio creates it when you open the project.
+- Dependencies are AndroidX AppCompat, Core-KTX and Material, plus JUnit for tests. No Compose, no
+  dependency injection, no coroutines.
 
-**A locked phone with the screen on usually can**, and the app is set up for it: `TagIntentActivity`
-is `showWhenLocked`, so a tap applies immediately and its toast is visible over the lock screen
-rather than being held back until the phone is unlocked.
+---
 
-Whether tags are read while locked is a system setting, not the app's call. Look for
-*Settings → Connected devices → Connection preferences → NFC → Require device unlock for NFC*
-(the wording varies; some phones call it Secure NFC). With it **on**, NFC does nothing until you
-unlock. Turning it off is a real trade-off: it also lets a payment card be read while the phone is
-locked, which is the reason it defaults to on.
+## If something does not work
+
+| Symptom | Cause |
+|---|---|
+| Tapping a tag does nothing | Screen off, or the phone is locked with *Require device unlock for NFC* on. Also check NFC is switched on at all. |
+| *"Could not write"* when programming a tag | The tag is locked, is not NDEF-capable, or moved out of range mid-write. Hold it still against the back of the phone. |
+| *"Could not change Do Not Disturb"* | The permission was revoked. Open the app and grant it again; the tap is deliberately discarded so nothing is recorded that did not happen. |
+| *"Already registered that tap"* | The same tag was read twice within two seconds. One tap, one toggle — this is the guard working. |
+| A recorded stretch says `0 s` | Under half a second elapsed. |
+| Notifications stayed silenced overnight | The closing tap was forgotten and the cap is off. Set one on the setup screen. |
+
+---
+
+## What this is not
+
+This is a deliberately small, self-contained app. It has **no sync, no cloud, no charts, and no
+history beyond what the phone holds**. It tracks two categories, not arbitrary projects, and it
+serves one person on one phone.
+
+A companion design document (kept outside this repository) plans a second phase: a queue of taps, a
+Google Apps Script endpoint and a Google Sheet as the permanent record, with charts for free and an
+iPhone Shortcut alongside. None of that is here, and the app is complete without it.
+
+---
 
 ## License
 
 [MIT](LICENSE) — do what you like with it, including at your own workshop.
-
-## Not in phase 1
-
-Room queue, `SyncWorker`, the Apps Script web app, the Google Sheet, the stats screen, and
-the iPhone Shortcut. See the design document for those.
