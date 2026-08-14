@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The outer layout handles system bar insets. It must not set its own padding:
-  fitsSystemWindows overwrites padding with the inset values. The inner layout owns the
-  spacing instead.
+  A ScrollView because the content is taller than a phone screen — without it the history at
+  the bottom is unreachable.
+
+  It also handles system bar insets, and so must not set its own padding: fitsSystemWindows
+  overwrites padding with the inset values. The inner layout owns the spacing instead.
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
@@ -82,7 +84,72 @@
             android:layout_marginTop="8dp"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
-        <!-- 3. What the last tap left study mode doing, and today's hours. -->
+        <!-- 3. The auto-close cap: how long a session may run if the closing tap is forgotten. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/cap_instructions"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/capHoursInput"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:importantForAutofill="no"
+                android:inputType="number"
+                android:maxLength="2"
+                android:maxLines="1" />
+
+            <!-- labelFor is what makes a screen reader announce the box as the hours field. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:labelFor="@id/capHoursInput"
+                android:text="@string/unit_hours" />
+
+            <EditText
+                android:id="@+id/capMinutesInput"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:importantForAutofill="no"
+                android:inputType="number"
+                android:maxLength="2"
+                android:maxLines="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:labelFor="@id/capMinutesInput"
+                android:text="@string/unit_minutes" />
+
+            <Button
+                android:id="@+id/saveCapButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="@string/cap_save" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/capStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <!-- 4. What the last tap left study mode doing, and the hours recorded so far. -->
         <TextView
             android:id="@+id/studyStateText"
             android:layout_width="match_parent"
@@ -108,4 +175,4 @@
 
     </LinearLayout>
 
-</FrameLayout>
+</ScrollView>

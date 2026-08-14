@@ -44,25 +44,34 @@ Study mode off
 47 min 12 s of personal project recorded
 ```
 
-Open the app for the day's running totals:
+Open the app for today, yesterday and the week:
 
 ```
 Study mode is ON — school work.
 Running for 12 min 30 s — not counted below until you tap.
+Closes automatically in 2 h 47 min if you forget.
 
 Today
   school work       2 h 14 min 8 s
   personal project     35 min 41 s
   total             2 h 49 min 49 s
+
+Yesterday
+  school work            1 h 5 min
+  total                  1 h 5 min
+
+Last 7 days
+  school work      9 h 12 min 30 s
+  personal project  2 h 4 min 10 s
+  total            11 h 16 min 40 s
 ```
 
-Two things worth knowing about those numbers:
+Things worth knowing about those numbers:
 
-- **Only today.** Yesterday's totals are dropped the moment the first segment of a new day is
-  recorded. Keeping real history is what the Google Sheet is for in phase 2 — here it would
-  mean a log that grows forever and pruning rules to get wrong.
-- **A session that crosses midnight counts entirely on the day it ended.** Splitting it would
-  be more accurate and a lot more code; the Sheet gets this right later from raw timestamps.
+- **Nothing is ever overwritten.** Every finished stretch is appended to a log file, and every
+  figure above is computed from it. Days rolling over lose nothing.
+- **A session that crosses midnight counts entirely on the day it ended.** Splitting it would be
+  more accurate and a lot more code; the Sheet gets this right later from raw timestamps.
 - **Durations read in hours, minutes and seconds, with zero units left out** — `2 h 14 min 3 s`,
   but `1 h` for an exact hour and `40 s` for a short demo tap. Never `0 hours`.
 - **The total is the sum of the figures above it**, each snapped to the second it is printed at,
@@ -71,6 +80,29 @@ Two things worth knowing about those numbers:
 The stretch running right now is shown separately because it is not recorded anywhere yet — it
 joins the totals when a tap closes it. That also means the numbers only refresh when you open
 the app; nothing ticks in the background.
+
+## Forgetting the second tap
+
+Forgetting to tap STUDY at the end is the normal failure mode of any toggle: the phone would stay
+silenced all night, and the session would eventually claim every hour since.
+
+So sessions close themselves. The cap is set on the setup screen in hours and minutes — three
+hours by default — and when it expires the phone is unsilenced, the session is closed, and the
+stretch is recorded **cut off at the cap rather than at whenever the alarm actually arrived**. It
+is flagged in the log as auto-closed, and anything containing one says so, because that figure is
+a cap and not a measurement.
+
+Two details:
+
+- **The cap runs from the start of the session**, not from the last category switch — otherwise
+  switching every hour would keep a session alive forever. Changing it mid-session moves the
+  deadline: raising three hours to six two hours in leaves four hours. Lowering it below the time
+  already elapsed closes the session almost immediately.
+- **Zero in both boxes turns it off**, for anyone who would rather it never intervened.
+
+The alarm is inexact (`setAndAllowWhileIdle`) so it needs no special permission, and may fire a few
+minutes late — which costs nothing, since the recorded time comes from the deadline, not the alarm.
+It is re-armed after a reboot or a reinstall, both of which drop pending alarms.
 
 ## How a tap reaches the app
 
@@ -97,15 +129,19 @@ tag tapped
 | `StudyTag.kt` | The two tags and the text written on them. |
 | `StudyState.kt` | What the app knows after the last tap. Immutable. |
 | `StudyModeController.kt` | The rules: current state + tag → new state, plus the stretch of time that tap just ended. No Android imports. |
-| `StudyTime.kt` | Segments, the day's totals, the local-midnight boundary, duration wording. All pure. |
-| `StudyStateStore.kt` | Saves the state and today's totals between taps (`SharedPreferences`). |
+| `StudyTime.kt` | Segments, totals per day and week, the local-midnight boundary, duration wording, the log line format. All pure. |
+| `StudyStateStore.kt` | Saves the state and the auto-close cap between taps (`SharedPreferences`). |
+| `SessionLog.kt` | Appends finished segments to a file, reads them back. The whole history. |
+| `AutoCloseScheduler.kt` | Sets and cancels the alarm for a forgotten closing tap. |
+| `AutoCloseReceiver.kt` | Closes the forgotten session; re-arms the alarm after a reboot. |
 | `DndController.kt` | Silences and unsilences the phone. |
 | `TagIntentActivity.kt` | No UI. Handles a tap, toasts, finishes. |
 | `MainActivity.kt` | Setup: permission, programming tags, current state. |
 
 `StudyModeController` and `StudyTime` have no Android dependencies on purpose. They hold the
-only real rules in the app, so every state × tag combination — and every bit of the time
-arithmetic — is covered by plain JVM unit tests: no emulator, no Robolectric, no tags needed:
+only real rules in the app, so every state × tag combination, the auto-close arithmetic and the
+log format are all covered by plain JVM unit tests — no emulator, no Robolectric, no tags, and no
+waiting three hours to find out whether the cap works:
 
 ```bash
 ./gradlew testDebugUnitTest

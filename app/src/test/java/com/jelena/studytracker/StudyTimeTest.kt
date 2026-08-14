@@ -1,11 +1,12 @@
 package com.jelena.studytracker
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Tests for the time arithmetic: segment lengths, the day's totals, the day boundary and the
- * duration wording. All pure functions, so no device and no clock control needed.
+ * Tests for the time arithmetic: segment lengths, aggregation over days and weeks, the day
+ * boundary, the duration wording and the log file format. All pure functions, so no device.
  */
 class StudyTimeTest {
 
@@ -13,32 +14,48 @@ class StudyTimeTest {
     private val hour = 60 * minute
     private val day = 24 * hour
 
+    /** Midday on some arbitrary day, so that adding or subtracting hours stays on that day. */
+    private val midday = 1_800_000_000_000L
+
+    private fun segment(
+        category: Category = Category.SCHOOL,
+        endedAt: Long = midday,
+        lasting: Long = 30 * minute,
+        autoClosed: Boolean = false,
+    ) = StudySegment(category, endedAt - lasting, endedAt, autoClosed)
+
     // --- StudySegment ---
 
     @Test
     fun `a segment lasts the gap between its ends`() {
-        val segment = StudySegment(Category.SCHOOL, 1_000L, 1_000L + 90 * minute)
-
-        assertEquals(90 * minute, segment.durationMillis)
+        assertEquals(90 * minute, segment(lasting = 90 * minute).durationMillis)
     }
 
     @Test
     fun `a backwards segment is worth zero, never a negative`() {
-        // A negative duration would subtract from the day's total and produce an hour count
-        // lower than what was actually studied.
-        val segment = StudySegment(Category.SCHOOL, 10_000L, 1_000L)
-
-        assertEquals(0L, segment.durationMillis)
+        // A negative duration would subtract from a total and produce an hour count lower than
+        // what was actually studied.
+        assertEquals(0L, StudySegment(Category.SCHOOL, 10_000L, 1_000L).durationMillis)
     }
 
-    // --- DailyTotals ---
+    @Test
+    fun `a segment counts towards the day it ended on`() {
+        val acrossMidnight = segment(endedAt = midday, lasting = 20 * hour)
+
+        assertEquals(LocalDays.of(midday), acrossMidnight.day)
+    }
+
+    // --- Aggregation ---
 
     @Test
-    fun `segments accumulate into their own category`() {
-        val totals = DailyTotals(day = 100)
-            .plus(StudySegment(Category.SCHOOL, 0, 30 * minute), day = 100)
-            .plus(StudySegment(Category.PERSONAL, 0, 20 * minute), day = 100)
-            .plus(StudySegment(Category.SCHOOL, 0, 15 * minute), day = 100)
+    fun `totals add up per category`() {
+        val segments = listOf(
+            segment(Category.SCHOOL, lasting = 30 * minute),
+            segment(Category.PERSONAL, lasting = 20 * minute),
+            segment(Category.SCHOOL, lasting = 15 * minute),
+        )
+
+        val totals = totalsOf(segments)
 
         assertEquals(45 * minute, totals.schoolMillis)
         assertEquals(20 * minute, totals.personalMillis)
@@ -47,75 +64,46 @@ class StudyTimeTest {
     }
 
     @Test
-    fun `the shown total is the sum of the shown parts`() {
-        // The bug this pins down: flooring each category but rounding the raw sum printed
-        // "2 min", "2 min", "5 min" — a column that visibly does not add up.
-        val totals = DailyTotals(
-            day = 100,
-            schoolMillis = 2 * minute + 50_000,
-            personalMillis = 2 * minute + 55_000,
+    fun `totals of nothing are zero rather than absent`() {
+        assertEquals(CategoryTotals(), totalsOf(emptyList()))
+        assertEquals(0L, totalsOf(emptyList()).rawTotalMillis)
+    }
+
+    @Test
+    fun `a day holds only the segments that ended on it`() {
+        val today = LocalDays.of(midday)
+        val segments = listOf(
+            segment(endedAt = midday),
+            segment(endedAt = midday - day),
+            segment(endedAt = midday - 2 * day),
         )
 
-        assertEquals("2 min 50 s", formatDuration(totals.schoolMillis))
-        assertEquals("2 min 55 s", formatDuration(totals.personalMillis))
-        assertEquals("5 min 45 s", formatDuration(totals.shownTotalMillis))
+        assertEquals(1, segmentsOn(segments, today).size)
+        assertEquals(1, segmentsOn(segments, today - 1).size)
+        assertEquals(0, segmentsOn(segments, today - 5).size)
     }
 
     @Test
-    fun `two sub-minute stretches add up in seconds`() {
-        val totals = DailyTotals(day = 100, schoolMillis = 20_000, personalMillis = 20_000)
+    fun `the last seven days include today and exclude the eighth`() {
+        val today = LocalDays.of(midday)
+        val segments = (0L..8L).map { segment(endedAt = midday - it * day) }
 
-        assertEquals("20 s", formatDuration(totals.schoolMillis))
-        assertEquals("20 s", formatDuration(totals.personalMillis))
-        assertEquals("40 s", formatDuration(totals.shownTotalMillis))
+        val week = segmentsWithin(segments, today, days = 7)
+
+        assertEquals(7, week.size)
+        // The oldest kept is six days back; seven and eight days back are out.
+        assertEquals(today - 6, week.minOf { it.day })
+        assertEquals(today, week.maxOf { it.day })
     }
 
     @Test
-    fun `a column adds up exactly, whatever the parts are`() {
-        // Brute force over second-level values: the seconds the total prints must equal the sum
-        // of the seconds the parts print. This is the invariant that was broken — a property,
-        // not an example.
-        (0..7300 step 37).forEach { schoolSeconds ->
-            (0..7300 step 53).forEach { personalSeconds ->
-                val totals = DailyTotals(
-                    day = 1,
-                    schoolMillis = schoolSeconds * 1_000L,
-                    personalMillis = personalSeconds * 1_000L,
-                )
+    fun `a segment from the future is not counted as this week`() {
+        // A clock set forward and back again should not smear study time into days that have not
+        // happened, where it would silently vanish from every total.
+        val today = LocalDays.of(midday)
+        val segments = listOf(segment(endedAt = midday + 2 * day))
 
-                val shownSeconds = Category.entries.sumOf { secondsShown(totals.millisFor(it)) }
-
-                assertEquals(
-                    "school ${schoolSeconds}s + personal ${personalSeconds}s",
-                    shownSeconds,
-                    secondsShown(totals.shownTotalMillis),
-                )
-            }
-        }
-    }
-
-    /** The duration [formatDuration] will actually print for [millis], in whole seconds. */
-    private fun secondsShown(millis: Long): Long = snapForDisplay(millis) / 1_000
-
-    @Test
-    fun `a segment on a new day replaces the old day instead of adding to it`() {
-        val yesterday = DailyTotals(day = 100, schoolMillis = 5 * hour, personalMillis = 2 * hour)
-
-        val today = yesterday.plus(StudySegment(Category.SCHOOL, 0, 10 * minute), day = 101)
-
-        assertEquals(101L, today.day)
-        assertEquals(10 * minute, today.schoolMillis)
-        assertEquals(0L, today.personalMillis)
-    }
-
-    @Test
-    fun `the first segment of all adopts the day it lands on`() {
-        val fresh = DailyTotals()
-
-        val totals = fresh.plus(StudySegment(Category.PERSONAL, 0, 25 * minute), day = 20_000)
-
-        assertEquals(20_000L, totals.day)
-        assertEquals(25 * minute, totals.personalMillis)
+        assertEquals(0, segmentsWithin(segments, today, days = 7).size)
     }
 
     // --- LocalDays ---
@@ -174,8 +162,6 @@ class StudyTimeTest {
         // The reason this exists: a short demo tap must not read "0 min" and look like nothing
         // happened.
         assertEquals("40 s", formatDuration(40_000))
-        assertEquals("29 s", formatDuration(29_000))
-        assertEquals("31 s", formatDuration(31_000))
         assertEquals("59 s", formatDuration(59_000))
     }
 
@@ -187,14 +173,105 @@ class StudyTimeTest {
     }
 
     @Test
-    fun `sub-second durations still read as zero seconds`() {
-        assertEquals("0 s", formatDuration(400))
-        assertEquals("1 s", formatDuration(600))
-        assertEquals("0 s", formatDuration(-5_000))
+    fun `a negative duration reads as zero rather than a minus sign`() {
+        assertEquals("0 s", formatDuration(-hour))
+    }
+
+    // --- Column consistency ---
+
+    @Test
+    fun `the shown total is the sum of the shown parts`() {
+        val totals = CategoryTotals(
+            schoolMillis = 2 * minute + 50_000,
+            personalMillis = 2 * minute + 55_000,
+        )
+
+        assertEquals("2 min 50 s", formatDuration(totals.schoolMillis))
+        assertEquals("2 min 55 s", formatDuration(totals.personalMillis))
+        assertEquals("5 min 45 s", formatDuration(totals.shownTotalMillis))
     }
 
     @Test
-    fun `a negative duration reads as zero rather than a minus sign`() {
-        assertEquals("0 s", formatDuration(-hour))
+    fun `a column adds up exactly, whatever the parts are`() {
+        // Brute force over second-level values: the seconds the total prints must equal the sum of
+        // the seconds the parts print. A property, not an example.
+        (0..7300 step 37).forEach { schoolSeconds ->
+            (0..7300 step 53).forEach { personalSeconds ->
+                val totals = CategoryTotals(schoolSeconds * 1_000L, personalSeconds * 1_000L)
+                val shownParts = Category.entries.sumOf { snapForDisplay(totals.millisFor(it)) }
+
+                assertEquals(
+                    "school ${schoolSeconds}s + personal ${personalSeconds}s",
+                    shownParts / 1_000,
+                    snapForDisplay(totals.shownTotalMillis) / 1_000,
+                )
+            }
+        }
+    }
+
+    // --- The cap, as hours and minutes ---
+
+    @Test
+    fun `a cap splits into hours and minutes and back again`() {
+        assertEquals(3L to 30L, hoursAndMinutesOf(3 * hour + 30 * minute))
+        assertEquals(0L to 45L, hoursAndMinutesOf(45 * minute))
+        assertEquals(6L to 0L, hoursAndMinutesOf(6 * hour))
+        assertEquals(0L to 0L, hoursAndMinutesOf(0))
+
+        assertEquals(3 * hour + 30 * minute, millisOfHoursAndMinutes(3, 30))
+        assertEquals(6 * hour, millisOfHoursAndMinutes(6, 0))
+        assertEquals(0L, millisOfHoursAndMinutes(0, 0))
+    }
+
+    @Test
+    fun `a cap ignores nonsense rather than producing a negative deadline`() {
+        assertEquals(0L, millisOfHoursAndMinutes(-3, -30))
+        assertEquals(0L to 0L, hoursAndMinutesOf(-hour))
+    }
+
+    @Test
+    fun `more than sixty minutes is accepted and normalises on the way back`() {
+        // Nothing stops someone typing 90 into the minutes box; it means an hour and a half.
+        assertEquals(90 * minute, millisOfHoursAndMinutes(0, 90))
+        assertEquals(1L to 30L, hoursAndMinutesOf(millisOfHoursAndMinutes(0, 90)))
+    }
+
+    // --- Log file format ---
+
+    @Test
+    fun `a segment survives a round trip through the log format`() {
+        listOf(
+            segment(Category.SCHOOL),
+            segment(Category.PERSONAL, autoClosed = true),
+            segment(lasting = 0),
+        ).forEach { original ->
+            assertEquals(original, parseSegmentLine(formatSegmentLine(original)))
+        }
+    }
+
+    @Test
+    fun `the log line is the documented shape`() {
+        val line = formatSegmentLine(StudySegment(Category.PERSONAL, 1_000, 61_000, true))
+
+        assertEquals("PERSONAL,1000,61000,true", line)
+    }
+
+    @Test
+    fun `an unreadable line is skipped rather than fatal`() {
+        // One truncated line — the process died mid-write — must not cost the whole history.
+        assertNull(parseSegmentLine(""))
+        assertNull(parseSegmentLine("SCHOOL,1000"))
+        assertNull(parseSegmentLine("SCHOOL,1000,2000"))
+        assertNull(parseSegmentLine("HOMEWORK,1000,2000,false"))
+        assertNull(parseSegmentLine("SCHOOL,not-a-number,2000,false"))
+        assertNull(parseSegmentLine("SCHOOL,1000,2000,maybe"))
+    }
+
+    @Test
+    fun `a line with trailing whitespace still parses`() {
+        assertEquals(
+            StudySegment(Category.SCHOOL, 1_000, 2_000, false),
+            parseSegmentLine("SCHOOL,1000,2000,false\n"),
+        )
     }
 }

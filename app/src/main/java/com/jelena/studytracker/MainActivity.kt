@@ -1,5 +1,6 @@
 package com.jelena.studytracker
 
+import android.annotation.SuppressLint
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
@@ -74,6 +75,52 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             // No in-app dialog exists for this permission — it is granted from a system list.
             startActivity(dndController.settingsIntent())
         }
+
+        binding.saveCapButton.setOnClickListener { saveCap() }
+    }
+
+    /**
+     * Stores the cap typed into the two fields and moves the alarm to match.
+     *
+     * Rescheduling immediately is the point of the feature: changing the cap during a session has
+     * to affect *that* session, not only the next one. The deadline stays anchored to the session
+     * start, so raising three hours to six two hours in leaves four hours, and lowering it below
+     * the time already elapsed closes the session almost at once.
+     */
+    private fun saveCap() {
+        // Empty fields read as zero rather than refusing: "3 h" with the minutes box left blank is
+        // an obvious intent, and zero in both is the documented way to turn the cap off.
+        val hours = binding.capHoursInput.text.toString().trim().toLongOrNull() ?: 0
+        val minutes = binding.capMinutesInput.text.toString().trim().toLongOrNull() ?: 0
+        val cap = millisOfHoursAndMinutes(hours, minutes)
+
+        stateStore.saveAutoCloseCapMillis(cap)
+        AutoCloseScheduler(this).sync(stateStore.load(), cap)
+
+        showCap()
+        showStudyState()
+    }
+
+    /**
+     * Fills the cap fields and the line that says what the cap currently means.
+     *
+     * The plain digits are deliberate, which is why lint's locale warning is suppressed here: these
+     * values are read straight back with `toLongOrNull`, and locale-formatted digits — Arabic-Indic,
+     * say — would fail to parse and silently reset the cap to zero.
+     */
+    @SuppressLint("SetTextI18n")
+    private fun showCap() {
+        val cap = stateStore.loadAutoCloseCapMillis()
+        val (hours, minutes) = hoursAndMinutesOf(cap)
+
+        binding.capHoursInput.setText(hours.toString())
+        binding.capMinutesInput.setText(minutes.toString())
+
+        binding.capStatusText.text = if (cap <= 0L) {
+            getString(R.string.cap_off)
+        } else {
+            getString(R.string.cap_on, formatDuration(cap))
+        }
     }
 
     /**
@@ -88,6 +135,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     override fun onResume() {
         super.onResume()
         showPermissionState()
+        showCap()
         showStudyState()
 
         val adapter = nfcAdapter
@@ -214,39 +262,81 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         // The stretch running right now is deliberately shown apart from the totals below:
         // it is not recorded anywhere yet, and will only join them when a tap closes it.
         binding.runningText.text = if (state.active && state.segmentStartedAtMillis > 0) {
-            val elapsed = System.currentTimeMillis() - state.segmentStartedAtMillis
-            getString(R.string.state_running, formatDuration(elapsed))
+            val now = System.currentTimeMillis()
+            val running = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
+
+            // While a session is running, when it will be given up on is the most useful thing the
+            // cap setting has to say — more so than the setting itself.
+            val deadline = StudyModeController.autoCloseDeadline(state, stateStore.loadAutoCloseCapMillis())
+            when {
+                deadline == null -> running
+                deadline <= now -> "$running\n" + getString(R.string.state_closing_now)
+                else -> "$running\n" + getString(R.string.state_closes_in, formatDuration(deadline - now))
+            }
         } else {
             ""
         }
 
-        binding.todayText.text = todayText()
+        binding.todayText.text = historyText()
     }
 
     /**
-     * Today's totals, or a nudge if nothing has been recorded yet.
+     * Today, yesterday and the last seven days, all computed from the session log.
      *
-     * Totals from an earlier day are treated as "nothing today" rather than shown: the stored
-     * numbers are only replaced when a segment is recorded, so at 9am they still hold
-     * yesterday's hours.
+     * Every figure is derived rather than stored, so there is no running total to drift or be
+     * wiped — and unlike the version this replaced, a day rolling over loses nothing.
      */
-    private fun todayText(): String {
-        val totals = stateStore.loadTotals()
-        if (totals.day != LocalDays.of(System.currentTimeMillis()) || totals.rawTotalMillis == 0L) {
-            return getString(R.string.today_nothing)
-        }
+    private fun historyText(): String {
+        val segments = SessionLog(this).readAll()
+        if (segments.isEmpty()) return getString(R.string.history_nothing)
+
+        val today = LocalDays.today()
+        val week = segmentsWithin(segments, today, days = 7)
 
         return buildString {
-            append(getString(R.string.today_heading))
+            append(block(getString(R.string.today_heading), segmentsOn(segments, today)))
+
+            // Only worth a block if there is something in it — an empty "Yesterday" is noise.
+            val yesterday = segmentsOn(segments, today - 1)
+            if (yesterday.isNotEmpty()) {
+                append("\n\n")
+                append(block(getString(R.string.yesterday_heading), yesterday))
+            }
+
+            append("\n\n")
+            append(block(getString(R.string.week_heading), week))
+
+            // An auto-closed stretch is a cap, not a measurement, so anything containing one has
+            // to say so rather than quietly presenting it as time studied.
+            if (week.any { it.autoClosed }) {
+                append("\n\n")
+                append(getString(R.string.history_auto_closed_note))
+            }
+        }
+    }
+
+    /** One heading, a per-category breakdown, and a total under it. */
+    private fun block(heading: String, segments: List<StudySegment>): String {
+        val totals = totalsOf(segments)
+
+        return buildString {
+            append(heading)
+
+            if (totals.rawTotalMillis == 0L) {
+                append("\n")
+                append(getString(R.string.history_nothing_line))
+                return@buildString
+            }
+
             Category.entries.forEach { category ->
                 val millis = totals.millisFor(category)
                 if (millis > 0) {
                     append("\n")
-                    append(getString(R.string.today_line, categoryLabel(category), formatDuration(millis)))
+                    append(getString(R.string.history_line, categoryLabel(category), formatDuration(millis)))
                 }
             }
             append("\n")
-            append(getString(R.string.today_total, formatDuration(totals.shownTotalMillis)))
+            append(getString(R.string.history_total, formatDuration(totals.shownTotalMillis)))
         }
     }
 

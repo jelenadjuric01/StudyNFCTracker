@@ -10,6 +10,12 @@
     -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!--
+      Lets the auto-close alarm be put back after a restart. Alarms are dropped on shutdown, so
+      without this one reboot would silently disable the safety net for a running session.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="true" />
@@ -64,6 +70,25 @@
                 <data android:mimeType="application/vnd.com.jelena.studytracker" />
             </intent-filter>
         </activity>
+
+        <!--
+          Ends a session whose closing tap never came, and re-arms that alarm after a restart.
+
+          exported="false": the alarm and the boot broadcast both come from the system, which is
+          exempt, so nothing outside the app has any business ending a session.
+
+          MY_PACKAGE_REPLACED is included alongside BOOT_COMPLETED because reinstalling the app
+          also drops its alarms — easy to miss while developing, and it would leave the phone
+          silenced with no safety net.
+        -->
+        <receiver
+            android:name=".AutoCloseReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

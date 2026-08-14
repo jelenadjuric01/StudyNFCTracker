@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 
 /**
- * Where [StudyState] and today's [DailyTotals] survive between taps.
+ * Where [StudyState] and the auto-close cap survive between taps.
  *
  * Each tap runs in a fresh, short-lived [TagIntentActivity] process, so nothing can be
  * held in memory: the state has to be read at the start of a tap and written at the end.
@@ -14,6 +14,8 @@ import android.util.Log
  * thread of an activity that finishes immediately — there is no coroutine scope to suspend
  * in, and the payload is a handful of numbers. Phase 2 introduces DataStore alongside the
  * endpoint and token, which do need async access.
+ *
+ * Recorded time is *not* here: that lives in [SessionLog], because it grows.
  */
 class StudyStateStore(context: Context) {
 
@@ -41,6 +43,7 @@ class StudyStateStore(context: Context) {
             lastTag = prefs.getString(KEY_LAST_TAG, null).let(StudyTag::fromPayload),
             lastTapAtMillis = prefs.getLong(KEY_LAST_TAP_AT, default.lastTapAtMillis),
             segmentStartedAtMillis = prefs.getLong(KEY_SEGMENT_STARTED_AT, default.segmentStartedAtMillis),
+            sessionStartedAtMillis = prefs.getLong(KEY_SESSION_STARTED_AT, default.sessionStartedAtMillis),
         )
     }
 
@@ -58,6 +61,7 @@ class StudyStateStore(context: Context) {
             .putString(KEY_LAST_TAG, state.lastTag?.payload)
             .putLong(KEY_LAST_TAP_AT, state.lastTapAtMillis)
             .putLong(KEY_SEGMENT_STARTED_AT, state.segmentStartedAtMillis)
+            .putLong(KEY_SESSION_STARTED_AT, state.sessionStartedAtMillis)
             .commit()
 
         // A failed commit — a full disk, an I/O error — is exactly the case this class uses
@@ -66,34 +70,22 @@ class StudyStateStore(context: Context) {
         if (!written) Log.e(TAG, "Saving the study state failed: $state")
     }
 
-    /** Reads today's totals, or an empty set of totals if nothing has been recorded yet. */
-    fun loadTotals(): DailyTotals = DailyTotals(
-        day = prefs.getLong(KEY_TOTALS_DAY, 0L),
-        schoolMillis = prefs.getLong(KEY_TOTALS_SCHOOL, 0L),
-        personalMillis = prefs.getLong(KEY_TOTALS_PERSONAL, 0L),
-    )
+    /**
+     * How long a session may run before it is closed automatically, in milliseconds.
+     *
+     * Defaults to [DEFAULT_AUTO_CLOSE_MILLIS] on a fresh install — a cap has to be on by default,
+     * since its whole purpose is to catch the tap you forgot to make. Zero means the user turned
+     * it off deliberately.
+     */
+    fun loadAutoCloseCapMillis(): Long =
+        prefs.getLong(KEY_AUTO_CLOSE_CAP, DEFAULT_AUTO_CLOSE_MILLIS)
 
-    /** Overwrites today's totals. Synchronous for the same reason as [save]. */
-    fun saveTotals(totals: DailyTotals) {
+    fun saveAutoCloseCapMillis(capMillis: Long) {
         val written = prefs.edit()
-            .putLong(KEY_TOTALS_DAY, totals.day)
-            .putLong(KEY_TOTALS_SCHOOL, totals.schoolMillis)
-            .putLong(KEY_TOTALS_PERSONAL, totals.personalMillis)
+            .putLong(KEY_AUTO_CLOSE_CAP, capMillis.coerceAtLeast(0L))
             .commit()
 
-        if (!written) Log.e(TAG, "Saving today's totals failed: $totals")
-    }
-
-    /**
-     * Adds a finished segment to the day's totals.
-     *
-     * The segment counts towards the day it *ended* on, so a session running past midnight
-     * lands entirely on the new day. Splitting it across both would be more accurate and a lot
-     * more code; the Google Sheet in phase 2 gets that right from the raw timestamps.
-     */
-    fun record(segment: StudySegment) {
-        val day = LocalDays.of(segment.endedAtMillis)
-        saveTotals(loadTotals().plus(segment, day))
+        if (!written) Log.e(TAG, "Saving the auto-close cap failed: $capMillis")
     }
 
     private fun String?.toCategory(fallback: Category): Category =
@@ -105,14 +97,15 @@ class StudyStateStore(context: Context) {
 
         const val FILE_NAME = "study_state"
 
+        /** Three hours: long enough for a real session, short enough to save a forgotten night. */
+        const val DEFAULT_AUTO_CLOSE_MILLIS = 3 * 60 * 60 * 1000L
+
         const val KEY_ACTIVE = "active"
         const val KEY_CATEGORY = "category"
         const val KEY_LAST_TAG = "last_tag"
         const val KEY_LAST_TAP_AT = "last_tap_at"
         const val KEY_SEGMENT_STARTED_AT = "segment_started_at"
-
-        const val KEY_TOTALS_DAY = "totals_day"
-        const val KEY_TOTALS_SCHOOL = "totals_school"
-        const val KEY_TOTALS_PERSONAL = "totals_personal"
+        const val KEY_SESSION_STARTED_AT = "session_started_at"
+        const val KEY_AUTO_CLOSE_CAP = "auto_close_cap"
     }
 }

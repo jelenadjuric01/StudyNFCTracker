@@ -97,9 +97,12 @@ object StudyModeController {
                 // Starting: the first segment begins now. Ending: nothing is running, and a
                 // leftover start time would later be read as a segment that never happened.
                 segmentStartedAtMillis = if (previous.active) 0L else tapAtMillis,
+                sessionStartedAtMillis = if (previous.active) 0L else tapAtMillis,
             )
 
             // The old category stops being tracked and the new one starts, at the same instant.
+            // sessionStartedAtMillis deliberately untouched: switching category does not restart
+            // the session, so it must not push the auto-close deadline back either.
             StudyTag.SWITCH -> previous.copy(
                 category = previous.category.toggled(),
                 segmentStartedAtMillis = tapAtMillis,
@@ -110,6 +113,49 @@ object StudyModeController {
             state = next.copy(lastTag = tag, lastTapAtMillis = tapAtMillis),
             completed = closedSegment(previous, tapAtMillis),
         )
+    }
+
+    /**
+     * Ends a session that nobody ended — the closing tap was forgotten.
+     *
+     * The resulting segment is cut off at [closeAtMillis] rather than the current time, so the
+     * recorded hours are the cap the user chose and not however long the phone sat there. It is
+     * flagged [StudySegment.autoClosed] because it is a cap, not a measurement.
+     *
+     * @param closeAtMillis the deadline the session should be treated as having ended at, from
+     *   [autoCloseDeadline].
+     * @return [TapResult.Changed] with the mode off, or [TapResult.Ignored] if there was nothing
+     *   running — which happens routinely, since a late alarm can arrive after a real closing tap.
+     */
+    fun autoClose(previous: StudyState, closeAtMillis: Long): TapResult {
+        if (!previous.active) return TapResult.Ignored(previous, IgnoredReason.MODE_OFF)
+
+        val completed = closedSegment(previous, closeAtMillis)?.copy(autoClosed = true)
+
+        return TapResult.Changed(
+            state = previous.copy(
+                active = false,
+                category = Category.SCHOOL,
+                segmentStartedAtMillis = 0L,
+                sessionStartedAtMillis = 0L,
+            ),
+            completed = completed,
+        )
+    }
+
+    /**
+     * When the running session should be given up on, or `null` if there is nothing to give up on.
+     *
+     * Measured from the start of the session, so changing the cap mid-session moves the deadline
+     * rather than extending it from now — setting six hours two hours in means four hours left,
+     * which is what "close it six hours after I started" means.
+     *
+     * @param capMillis how long a session may run unattended. Zero or less disables the cap
+     *   entirely, which is a deliberate escape hatch for anyone who does not want one.
+     */
+    fun autoCloseDeadline(state: StudyState, capMillis: Long): Long? {
+        if (!state.active || capMillis <= 0L || state.sessionStartedAtMillis <= 0L) return null
+        return state.sessionStartedAtMillis + capMillis
     }
 
     /**

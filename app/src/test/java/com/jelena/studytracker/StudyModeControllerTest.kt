@@ -41,6 +41,8 @@ class StudyModeControllerTest {
                     lastTag = StudyTag.STUDY,
                     lastTapAtMillis = now,
                     segmentStartedAtMillis = now,
+                    // Both start together; only the segment moves when the category is switched.
+                    sessionStartedAtMillis = now,
                 ),
                 completed = null,
             ),

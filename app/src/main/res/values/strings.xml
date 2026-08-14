@@ -25,15 +25,30 @@
     <string name="state_on">Study mode is ON — %1$s.</string>
     <string name="state_off">Study mode is off.</string>
     <string name="state_running">Running for %1$s — not counted below until you tap.</string>
+    <string name="state_closes_in">Closes automatically in %1$s if you forget.</string>
+    <string name="state_closing_now">Past the auto-close time — closing shortly.</string>
+
+    <!-- Auto-close cap -->
+    <string name="cap_instructions">Close the session automatically if the second tap is forgotten. Zero in both boxes turns this off.</string>
+    <string name="unit_hours">h</string>
+    <string name="unit_minutes">min</string>
+    <string name="cap_save">Save</string>
+    <string name="cap_on">Sessions close automatically %1$s after they start.</string>
+    <string name="cap_off">Sessions never close automatically. Forgetting the second tap leaves the phone silenced.</string>
+    <string name="auto_closed_toast">Study mode ended automatically — you forgot the second tap</string>
 
     <!--
-      Today's totals. The %1$-18s pads the category name to a fixed width so the durations
-      line up into a column; the TextView is monospaced for the same reason.
+      History. The %1$-18s pads the category name to a fixed width so the durations line up
+      into a column; the TextView is monospaced for the same reason.
     -->
     <string name="today_heading">Today</string>
-    <string name="today_line">  %1$-18s%2$s</string>
-    <string name="today_total">  total             %1$s</string>
-    <string name="today_nothing">No study time recorded today yet.</string>
+    <string name="yesterday_heading">Yesterday</string>
+    <string name="week_heading">Last 7 days</string>
+    <string name="history_line">  %1$-18s%2$s</string>
+    <string name="history_total">  total             %1$s</string>
+    <string name="history_nothing_line">  nothing yet</string>
+    <string name="history_nothing">No study time recorded yet. Tap the STUDY tag to start.</string>
+    <string name="history_auto_closed_note">Some of this was closed automatically, so those hours are a cap rather than a measurement.</string>
 
     <!-- Toasts shown on a tap -->
     <string name="tap_on">Study mode on — %1$s</string>

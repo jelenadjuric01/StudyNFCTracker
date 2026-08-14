@@ -87,7 +87,13 @@ class TagIntentActivity : AppCompatActivity() {
 
                 store.save(result.state)
                 // Only now that the tap has definitely taken effect do the minutes count.
-                result.completed?.let(store::record)
+                result.completed?.let { SessionLog(this).append(it) }
+
+                // Arm or cancel the safety net for whatever the state is now. Doing this on every
+                // accepted tap means a session started, switched or ended always leaves the alarm
+                // consistent with reality, with no separate bookkeeping to get wrong.
+                AutoCloseScheduler(this).sync(result.state, store.loadAutoCloseCapMillis())
+
                 toast(changedMessage(result.state, result.completed))
             }
         }

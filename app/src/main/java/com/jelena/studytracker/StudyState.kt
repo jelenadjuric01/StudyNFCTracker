@@ -27,6 +27,10 @@ enum class Category {
  * @property segmentStartedAtMillis when the stretch of time now being tracked began. Not the
  *   start of the session: the SWITCH tag closes one segment and opens another, so this moves
  *   mid-session. `0` whenever [active] is false.
+ * @property sessionStartedAtMillis when the session began — the STUDY tap that turned the mode
+ *   on. Unlike [segmentStartedAtMillis] this survives a category switch, because the auto-close
+ *   cap is measured from the start of studying, not from the last switch. `0` whenever [active]
+ *   is false.
  */
 data class StudyState(
     val active: Boolean = false,
@@ -34,4 +38,5 @@ data class StudyState(
     val lastTag: StudyTag? = null,
     val lastTapAtMillis: Long = 0L,
     val segmentStartedAtMillis: Long = 0L,
+    val sessionStartedAtMillis: Long = 0L,
 )
