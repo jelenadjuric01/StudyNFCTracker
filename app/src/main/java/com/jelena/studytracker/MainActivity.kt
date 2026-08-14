@@ -1,14 +1,23 @@
 package com.jelena.studytracker
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationManagerCompat
 import com.jelena.studytracker.databinding.ActivityMainBinding
 
 /**
@@ -67,6 +76,27 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var wasActive = false
 
     /**
+     * The Android 13+ notification permission dialog, and what to do with the answer.
+     *
+     * Registered as a field because [registerForActivityResult] must be called before the activity is
+     * started — doing it inside the button's listener would crash.
+     */
+    private val requestNotifications =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            // Refused. Android stops showing the dialog after a couple of refusals, and
+            // shouldShowRequestPermissionRationale going false is how it says so — at which point the
+            // button would silently do nothing, so send the user to Settings instead.
+            if (!granted &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+            ) {
+                openNotificationSettings()
+            }
+
+            showEverything()
+        }
+
+    /**
      * Refreshes the running line once a second for as long as this screen is in the foreground.
      *
      * Only that line: the totals cannot change while this screen is open, because it holds reader
@@ -113,6 +143,48 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
 
         binding.saveCapButton.setOnClickListener { saveCap() }
+        binding.grantAlarmButton.setOnClickListener { askForAlarmPermission() }
+    }
+
+    /**
+     * Asks for permission to sound the auto-close alarm.
+     *
+     * From Android 13 there is a permission to request. Before that there is not — notifications were
+     * switched off in system settings, which is also the only place to switch them back on.
+     */
+    private fun askForAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            openNotificationSettings()
+        }
+    }
+
+    /**
+     * Opens the system screen where notifications for this app can be turned back on.
+     *
+     * Two intents, because a per-app notification screen only exists from Android 8. Below that the
+     * app's details page is the nearest equivalent, and it has always been there.
+     */
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        } else {
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", packageName, null),
+            )
+        }
+
+        // Some vendor ROMs ship without one of these screens. Failing to open Settings must not take
+        // the app down with it, and saying so beats a button that appears to do nothing.
+        try {
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Log.e(TAG, "No notification settings screen on this phone", e)
+            Toast.makeText(this, R.string.settings_unavailable, Toast.LENGTH_LONG).show()
+        }
     }
 
     /**
@@ -217,6 +289,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         showPermission()
         showCap()
+        showAlarmPermission()
 
         binding.studyStateText.text = if (state.active) {
             getString(R.string.state_on, categoryLabel(this, state.category))
@@ -235,6 +308,22 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.dndStatusText.text =
             getString(if (granted) R.string.dnd_granted else R.string.dnd_missing)
         binding.grantDndButton.visibility = if (granted) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * Says whether the auto-close can actually sound an alarm, and offers to fix it if not.
+     *
+     * Both the line and the button disappear once notifications are allowed, and also when the cap is
+     * off — with no auto-close there is no alarm to ask about.
+     */
+    private fun showAlarmPermission() {
+        val capEnabled = stateStore.loadAutoCloseCapMillis() > 0
+        val allowed = NotificationManagerCompat.from(this).areNotificationsEnabled()
+
+        binding.alarmStatusText.visibility = if (capEnabled) View.VISIBLE else View.GONE
+        binding.grantAlarmButton.visibility = if (capEnabled && !allowed) View.VISIBLE else View.GONE
+        binding.alarmStatusText.text =
+            getString(if (allowed) R.string.alarm_granted else R.string.alarm_missing)
     }
 
     /**

@@ -37,6 +37,19 @@
     <string name="cap_off">Sessions never close automatically. Forgetting the second tap leaves the phone silenced.</string>
     <string name="auto_closed_toast">Study mode ended automatically — you forgot the second tap</string>
 
+    <!-- The alarm shown when a session is closed for you -->
+    <string name="auto_closed_title">Study mode ended automatically</string>
+    <string name="auto_closed_body">%1$s of %2$s recorded. Tap the STUDY tag again if you are still studying.</string>
+    <string name="auto_closed_body_plain">Tap the STUDY tag again if you are still studying.</string>
+    <string name="auto_closed_channel_name">Session closed automatically</string>
+    <string name="auto_closed_channel_description">Rings when a study session is closed for you because the second tap was forgotten.</string>
+
+    <!-- Notification permission, needed for that alarm to be heard -->
+    <string name="alarm_granted">Alarm when a session closes itself: on.</string>
+    <string name="alarm_missing">Allow notifications so an alarm sounds when a session closes itself. Without it the session still closes quietly.</string>
+    <string name="grant_alarm">Allow notifications</string>
+    <string name="settings_unavailable">This phone has no notification settings screen to open.</string>
+
     <!--
       History. The %1$-18s pads the category name to a fixed width so the durations line up
       into a column; the TextView is monospaced for the same reason.

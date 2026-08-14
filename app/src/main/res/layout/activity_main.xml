@@ -149,6 +149,20 @@
             android:layout_marginTop="8dp"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
+        <TextView
+            android:id="@+id/alarmStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+        <Button
+            android:id="@+id/grantAlarmButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/grant_alarm" />
+
         <!-- 4. What the last tap left study mode doing, and the hours recorded so far. -->
         <TextView
             android:id="@+id/studyStateText"

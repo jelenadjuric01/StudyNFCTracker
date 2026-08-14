@@ -61,10 +61,15 @@ class AutoCloseReceiver : BroadcastReceiver() {
 
         Log.i(TAG, "Session auto-closed at $deadline: ${result.completed}")
 
-        // Best effort only — invisible if the screen is off, which is the likely case. The real
-        // signal is notifications starting to arrive again, and the setup screen labels the
-        // recorded stretch as auto-closed so the number is never mistaken for a measurement.
-        Toast.makeText(context, R.string.auto_closed_toast, Toast.LENGTH_LONG).show()
+        // An alarm rather than a silent close: studying may still be going on, and the user needs to
+        // know the counting stopped and the STUDY tag needs tapping again.
+        //
+        // The toast is the fallback for a phone that will not show notifications at all. It is worth
+        // little — invisible if the screen is off, which is the likely case here — but it is better
+        // than nothing, and the setup screen still labels the recorded stretch as auto-closed.
+        if (!AutoCloseAlarm(context).alert(result.completed)) {
+            Toast.makeText(context, R.string.auto_closed_toast, Toast.LENGTH_LONG).show()
+        }
     }
 
     companion object {
