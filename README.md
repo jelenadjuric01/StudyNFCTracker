@@ -78,8 +78,12 @@ Things worth knowing about those numbers:
   rather than the raw sum rounded separately. Otherwise the column can disagree with itself.
 
 The stretch running right now is shown separately because it is not recorded anywhere yet — it
-joins the totals when a tap closes it. That also means the numbers only refresh when you open
-the app; nothing ticks in the background.
+joins the totals when a tap closes it.
+
+Those first two lines update every second while the app is open. The totals below them do not,
+because they cannot change: a tap cannot reach the tap handler while this screen holds NFC reader
+mode. The one exception is the auto-close firing while you watch, which does end the session — so
+the tick notices that and redraws everything. Nothing ticks once the app is in the background.
 
 ## Forgetting the second tap
 

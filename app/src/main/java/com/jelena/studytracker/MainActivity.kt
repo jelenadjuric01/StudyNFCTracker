@@ -8,6 +8,8 @@ import android.nfc.Tag
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.jelena.studytracker.databinding.ActivityMainBinding
@@ -54,6 +56,20 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      */
     @Volatile
     private var selectedTag = StudyTag.STUDY
+
+    /**
+     * Drives the once-a-second refresh of the running line. Main-thread only, which is what makes
+     * it safe to touch views from [tick].
+     */
+    private val ticker = Handler(Looper.getMainLooper())
+
+    /**
+     * Whether a session was running the last time the screen was drawn.
+     *
+     * [tick] compares against this to notice the auto-close alarm ending a session while the screen
+     * is open, which is the one way the totals can change without the user leaving this activity.
+     */
+    private var lastSeenActive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -138,6 +154,10 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         showCap()
         showStudyState()
 
+        // Delayed by one interval: showStudyState just drew the current values, so ticking
+        // immediately would redraw the same text.
+        ticker.postDelayed(tick, TICK_MILLIS)
+
         val adapter = nfcAdapter
         binding.nfcStatusText.text = when {
             adapter == null -> getString(R.string.no_nfc)
@@ -163,6 +183,10 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     override fun onPause() {
         super.onPause()
         nfcAdapter?.disableReaderMode(this)
+
+        // The other half of acquire-in-resume, release-in-pause. Leaving this running would keep
+        // waking the app while it is in the background to redraw a screen nobody is looking at.
+        ticker.removeCallbacks(tick)
     }
 
     /**
@@ -244,14 +268,16 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     /**
-     * Shows what the last tap left study mode doing, and how much today has added up to.
+     * Redraws everything: what the last tap left study mode doing, the stretch running now, and
+     * the recorded history.
      *
-     * Recomputed in [onResume] rather than ticking on a timer: a running session's elapsed
-     * time is a minute-scale number nobody needs to watch move, and a repeating timer would be
-     * one more thing to cancel correctly.
+     * Called when the screen appears and whenever the session starts or ends. The history part is
+     * the expensive half — it reads and parses the whole log file — which is why [tick] refreshes
+     * only the running line while the screen sits open.
      */
     private fun showStudyState() {
         val state = stateStore.load()
+        lastSeenActive = state.active
 
         binding.studyStateText.text = if (state.active) {
             getString(R.string.state_on, categoryLabel(state.category))
@@ -259,25 +285,61 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             getString(R.string.state_off)
         }
 
-        // The stretch running right now is deliberately shown apart from the totals below:
-        // it is not recorded anywhere yet, and will only join them when a tap closes it.
-        binding.runningText.text = if (state.active && state.segmentStartedAtMillis > 0) {
-            val now = System.currentTimeMillis()
-            val running = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
-
-            // While a session is running, when it will be given up on is the most useful thing the
-            // cap setting has to say — more so than the setting itself.
-            val deadline = StudyModeController.autoCloseDeadline(state, stateStore.loadAutoCloseCapMillis())
-            when {
-                deadline == null -> running
-                deadline <= now -> "$running\n" + getString(R.string.state_closing_now)
-                else -> "$running\n" + getString(R.string.state_closes_in, formatDuration(deadline - now))
-            }
-        } else {
-            ""
-        }
-
+        binding.runningText.text = runningText(state)
         binding.todayText.text = historyText()
+    }
+
+    /**
+     * The live part of the screen: how long the current stretch has been running, and how long
+     * until the session gives up on itself.
+     *
+     * Empty when nothing is running — there is no sensible number to show, and a stale one would
+     * be worse than none.
+     */
+    private fun runningText(state: StudyState): String {
+        // The stretch running right now is deliberately shown apart from the totals below: it is
+        // not recorded anywhere yet, and will only join them when a tap closes it.
+        if (!state.active || state.segmentStartedAtMillis <= 0) return ""
+
+        val now = System.currentTimeMillis()
+        val running = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
+
+        // While a session is running, when it will be given up on is the most useful thing the cap
+        // setting has to say — more so than the setting itself.
+        val deadline = StudyModeController.autoCloseDeadline(state, stateStore.loadAutoCloseCapMillis())
+        return when {
+            deadline == null -> running
+            deadline <= now -> "$running\n" + getString(R.string.state_closing_now)
+            else -> "$running\n" + getString(R.string.state_closes_in, formatDuration(deadline - now))
+        }
+    }
+
+    /**
+     * Refreshes the running line once a second for as long as this screen is in the foreground.
+     *
+     * Only that line: the day's and week's totals cannot change while the screen is open — a tap
+     * cannot reach [TagIntentActivity] because [onResume] holds reader mode — so re-reading the log
+     * every second would be work for nothing.
+     *
+     * The exception is the auto-close alarm, which *can* fire while the screen sits open. That
+     * ends the session from outside this activity, so the tick watches [StudyState.active] and
+     * redraws everything when it changes; otherwise the totals would silently omit the stretch
+     * that was just recorded.
+     */
+    private val tick = object : Runnable {
+        override fun run() {
+            val state = stateStore.load()
+
+            if (state.active != lastSeenActive) {
+                showStudyState()
+            } else {
+                binding.runningText.text = runningText(state)
+            }
+
+            // Rescheduled from here rather than on a fixed period, so a slow frame delays the next
+            // tick instead of queueing up behind it.
+            ticker.postDelayed(this, TICK_MILLIS)
+        }
     }
 
     /**
@@ -350,6 +412,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private companion object {
         /** Logcat tag. Filter on this to see only messages from this screen. */
         const val TAG = "MainActivity"
+
+        /** How often the running line is redrawn. One second, because it shows seconds. */
+        const val TICK_MILLIS = 1_000L
 
         /**
          * Which tag families reader mode should wake for — all four NFC Forum types.
