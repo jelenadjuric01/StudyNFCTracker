@@ -73,6 +73,8 @@
     <string name="history_line">  %1$-18s%2$s</string>
     <string name="history_total">  total             %1$s</string>
     <string name="history_nothing_line">  nothing yet</string>
+    <!-- Stands in for the totals for the moment it takes to read the log off the main thread. -->
+    <string name="history_loading">  reading the log…</string>
     <string name="history_nothing">No study time recorded yet. Tap the STUDY tag to start.</string>
     <string name="history_auto_closed_note">Some of this was closed automatically, so those hours are a cap rather than a measurement.</string>
 

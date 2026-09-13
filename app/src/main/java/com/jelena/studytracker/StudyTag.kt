@@ -3,7 +3,7 @@ package com.jelena.studytracker
 /**
  * The two physical tags, identified by the text stored on them.
  *
- * The tags themselves are dumb: each carries one NDEF record whose MIME type is
+ * The tags themselves are straightforward: each carries one NDEF record whose MIME type is
  * [TAG_MIME_TYPE] and whose payload is one of these [payload] strings. All meaning lives
  * in the app.
  *

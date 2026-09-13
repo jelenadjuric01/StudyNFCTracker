@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
 import com.jelena.studytracker.databinding.ActivityMainBinding
+import java.util.concurrent.Executors
 
 /**
  * The app's only screen, split into three tabs by the bar at the bottom:
@@ -79,6 +80,26 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var wasActive = false
 
     /**
+     * Where the session log is read. See [showHistory] for why it is not read on the main thread.
+     *
+     * Single-threaded, so a burst of refreshes cannot put two reads of the same file in flight at
+     * once, and shut down in [onDestroy] so the thread does not outlive the screen.
+     */
+    private val historyReader = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "history-reader").apply { isDaemon = true }
+    }
+
+    /**
+     * Which history read is the current one.
+     *
+     * A refresh can be asked for again before the previous read has been drawn — [onResume] and a
+     * tick that sees the session end can land within a second of each other. Stamping each request
+     * and dropping anything that is no longer the latest stops a stale summary being drawn over a
+     * fresh one.
+     */
+    private var historyRequest = 0
+
+    /**
      * The Android 13+ notification permission dialog, and what to do with the answer.
      *
      * Registered as a field because [registerForActivityResult] must be called before the activity is
@@ -112,7 +133,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      */
     private val tick = object : Runnable {
         override fun run() {
-            val state = stateStore.load()
+            val state = synchronized(StudyStateLock) { stateStore.load() }
 
             if (state.active != wasActive) showEverything() else showRunning(state)
 
@@ -259,6 +280,15 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     /**
+     * Lets go of the reader thread. Without this it would sit idle for the life of the process,
+     * holding the last summary it read.
+     */
+    override fun onDestroy() {
+        super.onDestroy()
+        historyReader.shutdown()
+    }
+
+    /**
      * Called by the NFC service each time a tag touches the phone, for as long as reader mode is
      * active.
      *
@@ -301,20 +331,26 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         val minutes = binding.capMinutesInput.text.toString().trim().toLongOrNull() ?: 0
         val cap = millisOfHoursAndMinutes(hours, minutes)
 
-        stateStore.saveAutoCloseCapMillis(cap)
-        autoClose.sync(stateStore.load(), cap)
+        // Under the lock for the same reason as the tap path: the auto-close worker may be
+        // part-way through reading this very cap and re-arming the alarm from it.
+        synchronized(StudyStateLock) {
+            stateStore.saveAutoCloseCapMillis(cap)
+            autoClose.sync(stateStore.load(), cap)
+        }
 
         showEverything()
     }
 
     /** Draws the whole screen. Cheap enough to do wholesale, except once a second — see [tick]. */
     private fun showEverything() {
-        val state = stateStore.load()
+        val (state, cap) = synchronized(StudyStateLock) {
+            stateStore.load() to stateStore.loadAutoCloseCapMillis()
+        }
         wasActive = state.active
 
         showPermission()
-        showCap()
-        showAlarmPermission()
+        showCap(cap)
+        showAlarmPermission(cap)
 
         binding.studyStateText.text = if (state.active) {
             getString(R.string.state_on, categoryLabel(this, state.category))
@@ -325,8 +361,41 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             getColor(if (state.active) R.color.ide_green else R.color.ide_text),
         )
 
-        showRunning(state)
-        binding.todayText.text = HistorySummary(this).text()
+        showRunning(state, cap)
+        showHistory()
+    }
+
+    /**
+     * Fills in the history block, reading the log on [historyReader] and drawing the result back on
+     * the main thread.
+     *
+     * Off the main thread because [SessionLog.readAll] parses the whole file, which is the only
+     * storage in this app that grows without bound — everything else here is a handful of numbers.
+     * The block keeps its placeholder until the first read lands, and its previous contents on every
+     * refresh after that.
+     *
+     * This does hold on to the activity while the read is in flight: the captured `TextView` knows
+     * the activity it belongs to, and the token check below reads a field, so the lambda captures
+     * `this` whatever the two locals below suggest. That is a few milliseconds and then the executor
+     * drops the task, so it is not a leak — but it is not nothing either, and this is not the shape
+     * to copy somewhere the work is long-running.
+     */
+    private fun showHistory() {
+        val request = ++historyRequest
+        val context = applicationContext
+        val target = binding.todayText
+
+        historyReader.execute {
+            val summary = synchronized(StudyStateLock) {
+                HistorySummary(context).text()
+            }
+
+            // View.post hands the result to the thread the view belongs to, which is the only one
+            // allowed to touch it.
+            target.post {
+                if (request == historyRequest) target.text = summary
+            }
+        }
     }
 
     /** Says whether Do Not Disturb access is granted, and hides the button once it is. */
@@ -345,8 +414,10 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      * The button disappears once notifications are allowed, and the whole card disappears when the
      * cap is off — with no auto-close there is no alarm to ask about.
      */
-    private fun showAlarmPermission() {
-        val capEnabled = stateStore.loadAutoCloseCapMillis() > 0
+    private fun showAlarmPermission(
+        cap: Long = synchronized(StudyStateLock) { stateStore.loadAutoCloseCapMillis() },
+    ) {
+        val capEnabled = cap > 0
         val allowed = NotificationManagerCompat.from(this).areNotificationsEnabled()
 
         binding.alarmCard.visibility = visibleIf(capEnabled)
@@ -364,8 +435,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      * would fail to parse and silently reset the cap to zero.
      */
     @SuppressLint("SetTextI18n")
-    private fun showCap() {
-        val cap = stateStore.loadAutoCloseCapMillis()
+    private fun showCap(
+        cap: Long = synchronized(StudyStateLock) { stateStore.loadAutoCloseCapMillis() },
+    ) {
         val (hours, minutes) = hoursAndMinutesOf(cap)
 
         binding.capHoursInput.setText(hours.toString())
@@ -386,14 +458,17 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
      * worse than none. The running stretch is deliberately kept apart from the totals below, because
      * it has not been recorded yet.
      */
-    private fun showRunning(state: StudyState) {
+    private fun showRunning(
+        state: StudyState,
+        cap: Long = synchronized(StudyStateLock) { stateStore.loadAutoCloseCapMillis() },
+    ) {
         val isRunning = state.active && state.segmentStartedAtMillis > 0
         binding.runningText.visibility = visibleIf(isRunning)
         if (!isRunning) return
 
         val now = System.currentTimeMillis()
         val line = getString(R.string.state_running, formatDuration(now - state.segmentStartedAtMillis))
-        val deadline = StudyModeController.autoCloseDeadline(state, stateStore.loadAutoCloseCapMillis())
+        val deadline = StudyModeController.autoCloseDeadline(state, cap)
 
         binding.runningText.text = when {
             deadline == null -> line

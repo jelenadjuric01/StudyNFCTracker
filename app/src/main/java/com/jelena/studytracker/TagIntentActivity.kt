@@ -51,6 +51,9 @@ class TagIntentActivity : AppCompatActivity() {
      *
      * The order matters: Do Not Disturb is applied before the state is saved, so a failure
      * to mute is reported as a failure rather than being recorded as success.
+     *
+     * Everything from the first read to the last write is held under [StudyStateLock], because
+     * [AutoCloseReceiver] runs the same sequence on a worker thread and the two must not interleave.
      */
     private fun handleTap(intent: Intent) {
         val tag = StudyTag.fromPayload(firstNdefPayload(intent))
@@ -61,6 +64,11 @@ class TagIntentActivity : AppCompatActivity() {
             return
         }
 
+        synchronized(StudyStateLock) { applyTap(tag) }
+    }
+
+    /** The part that must not interleave with the auto-close. Called with [StudyStateLock] held. */
+    private fun applyTap(tag: StudyTag) {
         val store = StudyStateStore(this)
         val dnd = DndController(this)
 

@@ -15,8 +15,6 @@ import java.io.IOException
  * A plain text file rather than Room, because the access pattern is "append one line" and "read
  * everything" — there is nothing to query, and a database would be a dependency and a schema for
  * no benefit. At an hour of study a day the file grows by well under a kilobyte a month.
- *
- * Phase 2 replaces this as the *record* — the Google Sheet does that — but not as the queue.
  */
 class SessionLog(context: Context) {
 

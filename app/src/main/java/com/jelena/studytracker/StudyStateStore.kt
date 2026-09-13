@@ -12,8 +12,7 @@ import android.util.Log
  *
  * [SharedPreferences] rather than DataStore because everything here happens on the main
  * thread of an activity that finishes immediately — there is no coroutine scope to suspend
- * in, and the payload is a handful of numbers. Phase 2 introduces DataStore alongside the
- * endpoint and token, which do need async access.
+ * in, and the payload is a handful of numbers.
  *
  * Recorded time is *not* here: that lives in [SessionLog], because it grows.
  */
