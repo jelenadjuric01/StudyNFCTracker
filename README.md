@@ -400,6 +400,63 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
+## What about iPhone?
+
+If you or your workshop participants use an iPhone, you cannot install this Android build directly. You have two main routes on iOS:
+
+### 1. Native iOS App (Swift / SwiftUI + CoreNFC)
+
+You can build a native iOS counterpart using **Swift**, **SwiftUI**, and Apple's **CoreNFC** framework (using background tag reading available on iPhone XS and newer):
+- **The Platform Wall (Do Not Disturb Access)**: On Android, `NotificationManager.setInterruptionFilter` allows third-party apps with `ACCESS_NOTIFICATION_POLICY` permission to programmatically silence and unsilence the phone. **iOS provides no public API for third-party apps to toggle system Do Not Disturb or Focus modes in the background.** iOS Focus Filter APIs only let apps filter their *own* internal notifications when the user activates a Focus mode; they do not let an app turn system-wide DND on or off on a tag tap.
+- **The Result**: A native iOS app can read the NFC tag, manage state, and log hours to local files or CoreData, but it cannot automatically silence the phone without user intervention.
+
+### 2. The Practical iOS Alternative: Apple Shortcuts
+
+Because the built-in **Apple Shortcuts** app has privileged first-party access to system settings, it can control Focus modes directly. Building the study tracker with Shortcuts automations gives you the exact same physical, zero-touch NFC workflow on an iPhone without writing any code.
+
+#### Step-by-Step: Building Study Tracker with iOS Shortcuts
+
+**Step 1: Create the STUDY Tag Automation**
+1. Open the **Shortcuts** app on iPhone and tap the **Automations** tab.
+2. Tap **+** (New Automation) and select **NFC** as the trigger.
+3. Tap **Scan**, tap your physical NFC sticker to the top edge of your iPhone, and name it `STUDY`.
+4. Choose **Run Immediately** (disable *Ask Before Running* and turn off *Notify When Run* so taps trigger instantly with zero friction).
+
+**Step 2: Add the Study Toggle Logic**
+Inside the automation action editor:
+1. **Check Current State**: Add **Get File from Shortcuts** (e.g. `study_state.json` stored in iCloud Drive / Shortcuts) to check if a session is currently running.
+2. **Add an `If` Condition**:
+   - **If session is active (ending a session)**:
+     - Action: **Set Focus** → Turn *Do Not Disturb* **Off**.
+     - Action: **Date** (Current Date) minus `start_time` from `study_state.json` → Calculate elapsed time.
+     - Action: **Append to File** → Append `category,start,end,duration` to `sessions.csv` in iCloud Drive / Shortcuts folder.
+     - Action: **Save File** → Update `study_state.json` with `{"active": false}`.
+     - Action: **Show Notification** → *"Study mode off: [Duration] of [Category] recorded"*.
+   - **Otherwise (starting a new session)**:
+     - Action: **Set Focus** → Turn *Do Not Disturb* **On** until turned off.
+     - Action: **Save File** → Write `{"active": true, "category": "school", "start_time": "[Current Date]"}` to `study_state.json`.
+     - Action: **Show Notification** → *"Study mode on — school work"*.
+
+**Step 3: Create the SWITCH Tag Automation**
+1. Create a second NFC Automation triggered by scanning your `SWITCH` tag (set to **Run Immediately**).
+2. **Logic**:
+   - Read `study_state.json`.
+   - If `active` is `true`: calculate the elapsed time for the current category, append the completed stretch to `sessions.csv`, toggle `category` between `"school"` and `"personal"`, update `start_time` to current time in `study_state.json`, and show a notification (*"Switched to personal project"*).
+   - If `active` is `false`: show a notification (*"Not studying — tap STUDY first"*).
+
+**Step 4: Reviewing History**
+- Open `sessions.csv` in Apple Numbers, Files, or create a simple display shortcut that reads the CSV and calculates daily and 7-day totals.
+
+---
+
+### What about Kotlin Multiplatform (KMP)?
+
+**Kotlin Multiplatform (KMP)** and Compose Multiplatform are rapidly emerging across the mobile ecosystem, closing the architectural gap between platform-specific apps by sharing pure Kotlin business logic (`StudyModeController`, `StudySegment`, `StudyTime`), state storage, and serialization across Android and iOS.
+
+However, KMP compiles shared code against platform-native APIs via `expect` / `actual` bindings. Because iOS itself lacks an API for third-party apps to toggle system Do Not Disturb programmatically, **KMP cannot bridge this limitation for our study tracker**. The business logic and math can be shared 100%, but the physical hardware payoff—silencing notifications seamlessly on a desk tap—remains blocked by Apple's OS sandboxing rules, making Apple Shortcuts or platform-specific workarounds necessary on iOS.
+
+---
+
 ## What this is not
 
 This is a deliberately small, self-contained app. It has **no sync, no cloud, no charts, and no
