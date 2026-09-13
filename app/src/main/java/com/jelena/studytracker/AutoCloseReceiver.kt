@@ -51,7 +51,7 @@ class AutoCloseReceiver : BroadcastReceiver() {
                 } finally {
                     // In a finally, and not optional: a PendingResult that is never finished holds
                     // the process up until the system times it out.
-                    pending.finish()
+                    pending?.finish()
                 }
             }
         } catch (e: RuntimeException) {
@@ -59,7 +59,7 @@ class AutoCloseReceiver : BroadcastReceiver() {
             // ever finish the result. The one path that would otherwise hold the broadcast open
             // until the system force-finishes it.
             Log.e(TAG, "Could not hand off $action", e)
-            pending.finish()
+            pending?.finish()
         }
     }
 

@@ -142,11 +142,24 @@ class TagIntentActivity : AppCompatActivity() {
      * no readable record.
      *
      * Both tags hold exactly one record, so anything beyond the first is ignored.
+     *
+     * Also checks string extras ("tag", "payload", or [NfcAdapter.EXTRA_NDEF_MESSAGES])
+     * and intent data so that simulated taps can be sent directly via ADB (e.g. `am start --es tag study`)
+     * when testing on emulators without physical NFC hardware.
      */
     private fun firstNdefPayload(intent: Intent): String? {
-        val messages = ndefMessages(intent) ?: return null
-        val record = messages.firstOrNull()?.records?.firstOrNull() ?: return null
-        return String(record.payload, Charsets.UTF_8)
+        val messages = ndefMessages(intent)
+        val record = messages?.firstOrNull()?.records?.firstOrNull()
+        if (record != null) {
+            return String(record.payload, Charsets.UTF_8)
+        }
+        val stringExtra = intent.getStringExtra("tag")
+            ?: intent.getStringExtra("payload")
+            ?: intent.getStringExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        if (stringExtra != null) {
+            return stringExtra
+        }
+        return intent.data?.schemeSpecificPart ?: intent.dataString
     }
 
     /**
