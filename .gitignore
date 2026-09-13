@@ -52,8 +52,11 @@ secrets.properties
 .idea/deploymentTargetSelector.xml
 .idea/deploymentTargetDropDown.xml
 .idea/androidTestResultsUserPreferences.xml
+.idea/deviceManager.xml
 .idea/appInsightsSettings.xml
 .idea/studiobot.xml
+app/.idea/
+.output.txt
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/

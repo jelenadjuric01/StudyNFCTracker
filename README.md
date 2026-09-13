@@ -24,14 +24,11 @@ Everything stays on the phone. No account, no network, no server.
 
 | | |
 |---|---|
-| **An Android phone with NFC** | Android 7.0 (API 24) or newer. The emulator cannot do NFC, so testing needs a real device. |
-| **Two writable NFC tags** | NTAG213/215/216 stickers are the usual choice and cost very little. Any NDEF-writable tag works. The app programs them for you. |
-| **Do Not Disturb access** | A one-off grant in system settings. The app cannot silence anything without it. |
+| **An Android phone or Emulator** | Android 7.0 (API 24) or newer. Physical hardware is needed for programming physical NFC tags; the included simulation scripts and test suite allow full testing on an Android Emulator. |
+| **Two writable NFC tags** | NTAG213/215/216 stickers are the usual choice and cost very little. Any NDEF-writable tag works. The app programs them for you. *(Optional if using Emulator simulation).* |
+| **Do Not Disturb access** | A one-off grant in system settings. The app cannot silence notifications without it. |
 | **Notification permission** | Optional. Only needed for the alarm when a session closes itself. |
 | **To build it yourself** | JDK 21 and the Android SDK. See [Building](#building). |
-
-Teaching this? [WORKSHOP.md](WORKSHOP.md) breaks the app into six steps that each end with something
-demonstrable, and no step rewrites what an earlier one built.
 
 ---
 
@@ -43,15 +40,15 @@ demonstrable, and no step rewrites what an earlier one built.
 below takes you to the right system screen, because Android has no in-app dialog for this
 permission. Nothing works until it is on.
 
-**3. Program the tags.** Choose `STUDY`, hold a tag flat against the back of the phone, and wait for
-*"Written: study"*. Choose `SWITCH` and do the same with the other tag. The app must be open for
-this — while it is, it takes over the NFC radio so that tapping a tag writes to it instead of
-triggering study mode.
+**3. Program the tags.** *(Physical device only)* Switch to the **Tags** tab. Choose `STUDY`, hold a
+tag flat against the back of the phone, and wait for *"Written: study"*. Choose `SWITCH` and do the
+same with the other tag. The app must be open for this — while it is, it takes over the NFC radio so
+that tapping a tag writes to it instead of triggering study mode.
 
 **4. Label the tags with a pen.** They are identical once written, and the only way to tell them
 apart afterwards is to tap one and see what happens.
 
-**5. Set the auto-close cap** if three hours is not what you want. See
+**5. Set the auto-close cap** on the **Setup** tab if three hours is not what you want. See
 [Forgetting the second tap](#forgetting-the-second-tap).
 
 Then close the app. Day to day you only tap the tags — you open the app to check your hours.
@@ -219,10 +216,8 @@ The network is never on this path, which is why a tap is instant.
 
 ### The files
 
-| File | Job |
-|---|---|
-Fifteen small files, each with one job. The five at the top have no Android imports at all, which
-is what makes the rules testable without a phone.
+Sixteen small files, each with one job. The files without Android dependencies hold pure domain logic,
+making the rules fully testable on a local JVM without a device.
 
 | File | Job |
 |---|---|
@@ -231,6 +226,7 @@ is what makes the rules testable without a phone.
 | `StudyModeController.kt` | The rules: state + tag → new state, the stretch just ended, and when to give up on a session. |
 | `StudySegment.kt` | A recorded stretch, totals over a day or a week, and the log line format. |
 | `StudyTime.kt` | Durations in words, and which local day a moment belongs to. |
+| `StudyStateLock.kt` | Application-wide monitor lock serializing background and foreground storage access. |
 | `SessionLog.kt` | Appends finished stretches to the log file and reads them back. |
 | `StudyStateStore.kt` | Current state and the cap, in `SharedPreferences`. |
 | `DndController.kt` | Silences and unsilences the phone. |
@@ -240,18 +236,7 @@ is what makes the rules testable without a phone.
 | `AutoCloseAlarm.kt` | Rings, so you know a session was closed for you. |
 | `HistorySummary.kt` | Builds the today / yesterday / last-7-days text. |
 | `TagIntentActivity.kt` | No UI. Handles a tap, reports it, finishes. |
-| `MainActivity.kt` | The setup screen. Wiring only. |
-
-`StudyModeController`, `StudySegment`, `StudyTime`, `StudyState` and `StudyTag` deliberately have no
-Android dependencies. They hold every real rule in the app, so the whole rule set is covered by
-plain JVM tests — 56 of them, over every
-state × tag combination, the double-tap guard, the duration arithmetic, the day boundary, the log
-format and the auto-close. No emulator, no Robolectric, no tags, and no waiting three hours to find
-out whether the cap works.
-
-```bash
-./gradlew testDebugUnitTest
-```
+| `MainActivity.kt` | Tab navigation, settings, history display, and NFC tag programming. |
 
 Silencing uses `INTERRUPTION_FILTER_PRIORITY` rather than blocking everything, so whatever you have
 marked as important — starred contacts, alarms — still gets through. A study session cannot swallow
@@ -259,11 +244,130 @@ an emergency call.
 
 ---
 
+## Testing
+
+The project uses a three-tier testing strategy covering pure logic, Android OS integration, and virtual device emulation.
+
+### 1. Local Unit Tests (Host JVM)
+
+`StudyModeController`, `StudySegment`, `StudyTime`, `StudyState`, `StudyTag`, and `StudyStateLock` are covered by 61 fast JVM tests. They run locally in ~1 second with no emulator, no Robolectric, and no physical tags required.
+
+```bash
+./gradlew testDebugUnitTest
+# or run all unit tests:
+./gradlew test
+```
+
+Tested areas include:
+- Every `StudyState` × `StudyTag` transition.
+- Rapid duplicate-tap debounce protection (2-second window).
+- Time formatting, midnight boundary rollover, and weekly aggregation.
+- Auto-close cap deadline math and pre-cap / post-cap detection.
+- Multithreaded lock safety and state synchronization (`StudyStateLockTest`).
+
+---
+
+### 2. Instrumented Android Tests (Emulator or Real Device)
+
+Located in `app/src/androidTest/`, these tests run directly on the Android ART runtime (API 24+) to verify real system intents, AndroidX lifecycle scenarios, `SharedPreferences` persistence, and broadcast handling.
+
+With an emulator running or a phone connected via USB:
+
+```bash
+# Run all instrumented tests:
+./gradlew connectedDebugAndroidTest
+
+# Run specific test suites:
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.jelena.studytracker.NfcTapSimulationTest
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.jelena.studytracker.AutoCloseSimulationTest
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.jelena.studytracker.MainActivityUiTest
+```
+
+| Test Suite | What it verifies |
+|---|---|
+| `NfcTapSimulationTest.kt` | Simulates `STUDY` and `SWITCH` NFC taps using real `NdefMessage` parcels, debounce guards, category switches, unknown payloads, and DND permission refusal. |
+| `AutoCloseSimulationTest.kt` | Verifies `ACTION_AUTO_CLOSE` broadcast handling, session cap truncation, and alarm re-arming on system reboot (`BOOT_COMPLETED`) or app update (`MY_PACKAGE_REPLACED`). |
+| `MainActivityUiTest.kt` | Exercises tab navigation (Session / Tags / Setup), auto-close cap persistence, live timer ticks, and asynchronous history summary rendering. |
+
+---
+
+### 3. Testing on an Android Virtual Device (Emulator)
+
+Standard Android emulators do not have physical NFC radio hardware. However, the app is fully testable on an emulator using **intent simulation scripts** that interact directly with the running app.
+
+#### Step 1: Start the Emulator & Launch the App
+1. Open Android Studio → **Tools > Device Manager** → Start your virtual device (e.g. *Pixel 8 API 35*).
+2. Install and open the app:
+   ```bash
+   ./gradlew installDebug
+   adb shell am start -n com.jelena.studytracker/.MainActivity
+   ```
+
+#### Step 2: Interactive Terminal Simulation Scripts
+Keep `MainActivity` open on the emulator screen, then run these scripts from your terminal to trigger live actions in real time:
+
+- **Start studying (School)**:
+  ```bash
+  ./tap_study.sh
+  ```
+  *(Watch the emulator: a Toast appears, status updates to "Studying School", and the timer starts ticking live).*
+
+- **Switch category to Personal**:
+  ```bash
+  ./tap_switch.sh
+  ```
+  *(Watch the category update to Personal while the timer continues counting).*
+
+- **Stop studying & record session**:
+  ```bash
+  ./tap_study.sh
+  ```
+  *(Watch status return to "Not studying" and the History section update with your recorded time).*
+
+- **Simulate auto-close timeout**:
+  ```bash
+  ./trigger_autoclose.sh
+  ```
+
+- **Reset storage to clean state**:
+  ```bash
+  ./reset_storage.sh
+  ```
+
+#### Step 3: Visual Demonstration Test
+If you want to sit back and watch an automated end-to-end demo on the emulator screen:
+1. Open `app/src/androidTest/java/com/jelena/studytracker/MainActivityUiTest.kt`.
+2. Run **`demonstrateLiveWorkflowOnScreen`** (includes deliberate 2–4 second pauses between actions to showcase the live timer, tab switching, and cap settings).
+
+---
+
+### 4. Testing on a Physical Android Phone
+
+To test with real physical NFC stickers:
+
+1. **Enable Developer Options & USB Debugging**:
+   - *Settings → About Phone* → Tap **Build Number** 7 times.
+   - *Settings → System → Developer Options* → Turn on **USB Debugging** (and ensure **NFC** is turned on in settings).
+2. **Connect phone & install**:
+   ```bash
+   ./gradlew installDebug
+   ```
+3. **Grant Permissions**:
+   - Open the app and grant **Do Not Disturb Access** (or run `adb shell cmd notification allow_dnd com.jelena.studytracker`).
+   - Grant Notification permission for auto-close alarms.
+4. **Program your NFC stickers**:
+   - Go to the **Tags** tab in the app.
+   - Choose `STUDY` and hold a sticker to the back of the phone until written.
+   - Choose `SWITCH` and hold the second sticker until written.
+5. **Tap and study!**
+
+---
+
 ## Building
 
 ```bash
 ./gradlew assembleDebug     # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest # the test suite
+./gradlew testDebugUnitTest # the JVM test suite
 ```
 
 Then install it over USB or wireless debugging:
@@ -278,8 +382,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Known-good versions: AGP 8.7.3, Kotlin 2.0.21, Gradle 8.11.1, compileSdk 35, minSdk 24.
 - `local.properties` holds the Android SDK path, is specific to your machine, and is not in the
   repository. Android Studio creates it when you open the project.
-- Dependencies are AndroidX AppCompat, Core-KTX and Material, plus JUnit for tests. No Compose, no
-  dependency injection, no coroutines.
+- Dependencies are AndroidX AppCompat, Core-KTX and Material, plus JUnit and AndroidX Test libraries.
 
 ---
 
@@ -293,6 +396,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | *"Already registered that tap"* | The same tag was read twice within two seconds. One tap, one toggle — this is the guard working. |
 | A recorded stretch says `0 s` | Under half a second elapsed. |
 | Notifications stayed silenced overnight | The closing tap was forgotten and the cap is off. Set one on the setup screen. |
+| Simulation scripts say DND permission denied | Run `adb shell cmd notification allow_dnd com.jelena.studytracker` to grant DND access on your emulator or test device. |
 
 ---
 
